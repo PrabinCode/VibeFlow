@@ -1,0 +1,598 @@
+# CLAUDE.md - SimpMusic Project Guide for AI Agents
+
+## 🌐 Language Rule
+
+**Response language**: Always respond in **English**, and after each sentence, add a **Vietnamese translation in parentheses**.
+Example: "Hello, how are you? (Xin chào, bạn khỏe không?)"
+
+This applies to all conversations in this project. The user is using Max plan so token cost is not a concern.
+
+## 📋 Project Overview
+
+**SimpMusic** is a FOSS (Free and Open Source Software) YouTube Music client for Android and Desktop, built with Compose Multiplatform.
+
+### Main Purpose
+- Stream music from YouTube Music and YouTube for free, ad-free, with background playback
+- Provide advanced features like Spotify Canvas, AI song suggestions, synced lyrics
+- Support both Android and Desktop (Windows, macOS, Linux)
+
+### Basic Information
+- **Package name**: `com.maxrave.simpmusic`
+- **Primary language**: Kotlin
+- **UI Framework**: Jetpack Compose / Compose Multiplatform
+- **Architecture**: Clean Architecture + MVVM
+- **Build system**: Gradle (Kotlin DSL)
+
+## 🏗️ Architecture
+
+### Clean Architecture Layers
+
+```
+┌─────────────────────────────────────┐
+│  Presentation Layer (UI)            │
+│  - Jetpack Compose / Compose MP     │
+│  - ViewModels (MVVM)                │
+│  - UI States                        │
+├─────────────────────────────────────┤
+│  Domain Layer                       │
+│  - Use Cases                        │
+│  - Domain Models                    │
+│  - Repository Interfaces            │
+├─────────────────────────────────────┤
+│  Data Layer                         │
+│  - Repository Implementations       │
+│  - Data Sources (Remote/Local)      │
+│  - Database (Room)                  │
+├─────────────────────────────────────┤
+│  Service Layer                      │
+│  - YouTube Music Scraper            │
+│  - Spotify Service                  │
+│  - AI Service                       │
+│  - Lyrics Service                   │
+│  - Discord RPC (Kizzy)              │
+└─────────────────────────────────────┘
+```
+
+## 📁 Module Structure
+
+### Root Modules
+
+#### 1. **composeApp/**
+- **Shared Compose Multiplatform module** - main module containing shared code
+- Supports: Android, Desktop (JVM), iOS (future)
+- Contains all UI (Compose) and business logic
+- Source sets:
+  - `commonMain/`: Shared code for all platforms
+  - `androidMain/`: Android-specific code
+  - `desktopMain/`: Desktop-specific code
+- Can run **Desktop app directly** from this module
+
+#### 2. **androidApp/**
+- **Android-specific module** to build Android app
+- Depends on `composeApp` as a shared module
+- Contains Android-specific configuration:
+  - AndroidManifest.xml
+  - Android build configuration
+  - Android resources (if needed)
+  - Entry point for Android app
+
+#### 3. **core/**
+Contains core modules organized by functionality:
+
+##### **core/common/**
+- Shared utilities
+- Extension functions
+- Constants
+- Helper classes
+
+##### **core/domain/**
+- Domain models
+- Use cases
+- Repository interfaces
+- Business logic rules
+
+##### **core/data/**
+- Repository implementations
+- Data sources (Remote & Local)
+- Database schemas (Room)
+- Data mappers
+
+##### **core/media/**
+- **media3/**: Media3 ExoPlayer integration (includes `CrossfadeExoPlayerAdapter` for DJ-style crossfade on Android)
+- **media3-ui/**: Media3 UI components
+- **media-jvm/**: JVM media playback (libmpv via JNA — replaced VLCJ, which replaced GStreamer post-1.0.4)
+- **media-jvm-ui/**: JVM media UI components
+
+##### **core/service/**
+Service modules:
+
+- **kotlinYtmusicScraper/**: YouTube Music API scraper
+- **spotify/**: Spotify Web API integration (Canvas, Lyrics)
+- **aiService/**: AI features (OpenAI, Gemini integration)
+- **lyricsService/**: Lyrics fetching (LRCLIB, SimpMusic Lyrics, BetterLyrics)
+- **kizzy/**: Discord Rich Presence
+- **ktorExt/**: Ktor extensions for networking
+
+#### 4. **crashlytics/** & **crashlytics-empty/**
+- **crashlytics/**: Full version with Sentry crash reporting
+- **crashlytics-empty/**: FOSS version without tracking
+
+#### 5. **cast/** & **cast-empty/**
+#### 6. **lastfm/** & **lastfm-empty/**
+- **lastfm/**: direct Last.fm scrobbling for the Full build. KMP (android + jvm + ios), package `org.simpmusic.lastfm`. Signs `api_sig` with okio's MD5; talks to `ws.audioscrobbler.com/2.0/` over form-urlencoded POST
+- **lastfm-empty/**: FOSS no-op stub with the identical public API — `isLastfmAvailable()` returns `false`, which hides the whole settings block. A FOSS build ships no API secret, so it ships no Last.fm code either
+- Selected via `isFullBuild` in `core/data/build.gradle.kts` (playback hooks) and `composeApp/build.gradle.kts` (UI); credentials come from `LASTFM_API_KEY`/`LASTFM_SECRET` in `local.properties` via BuildKonfig, and are handed in with `configLastfm(key, secret)` at startup — the same shape as `configCrashlytics(context, dsn)`
+- Auth is Last.fm's **web flow** on every platform: open `last.fm/api/auth/?api_key=X` with **no token**, the user approves in their own browser, Last.fm redirects to the callback with `?token=`, then `auth.getSession`. The app never sees a password. **Do not switch to the desktop flow** (`auth.getToken` first, then open the same URL with `&token=` on it): that tells Last.fm the app already holds the token, so it renders a "return to the application" page and the callback is never called — which looks exactly like a broken redirect
+- The callback registered on the API account is `wordbyword://lastfm-auth`, handled by an intent-filter on Android and by Conveyor `url-schemes` + `WindowsProtocolRegistrar` on Desktop; the login screen also accepts the callback URL pasted by hand, for hosts where no scheme handler exists
+
+#### 7. **cast/** & **cast-empty/**
+- **cast/**: Google Cast support for the Full build (`media3-cast` + `play-services-cast-framework`, `CastOptionsProvider`, `CastIconButton` Compose wrapper for `MediaRouteButton`)
+- **cast-empty/**: FOSS no-op stub with identical public API (package `org.simpmusic.cast`), keeping GMS out of F-Droid builds
+- Selected via the `isFullBuild` Gradle property (same pattern as crashlytics) in `core/media/media3/build.gradle.kts` and `composeApp/build.gradle.kts` androidMain
+- Playback handoff lives in `core/media/media3` (`cast/CastHandoffManager.kt` + `cast/CastStreamResolver.kt`): the session player is `CastPlayer.Builder().setLocalPlayer(forwardingPlayer).build()`; while remote, `CrossfadeExoPlayerAdapter` routes transport/getters to the receiver and pushes a resolved-URL queue window (googlevideo URLs resolved up-front via `StreamRepository`); crossfade/EQ/precache are force-disabled while casting
+
+## 🛠️ Key Technologies
+
+### Android/Mobile
+- **Jetpack Compose**: Modern UI toolkit
+- **Material Design 3**: Design system
+- **Media3 (ExoPlayer)**: Media playback
+- **Room**: Local database
+- **Coroutines & Flow**: Async programming
+- **Hilt/Koin**: Dependency injection
+
+### Desktop
+- **Compose for Desktop**: UI
+- **libmpv** (mpv's C client API, bound with JNA): audio + video playback. Replaced VLCJ, which had replaced GStreamer post-1.0.4
+- libmpv natives are bundled per platform via `./gradlew :composeApp:mpvSetupAll` into `mpv-natives/<os>-<arch>/`
+
+### Networking & APIs
+- **Ktor Client**: HTTP client
+- **Kotlin Serialization**: JSON parsing
+- **YouTube Music hidden API**: Data source
+- **Spotify Web API**: Canvas and lyrics
+- **OpenAI/Gemini API**: AI features
+
+### Data & Storage
+- **Room Database**: Local persistence
+- **DataStore**: Preferences
+- **Caching**: Offline playback support
+
+### Third-party Integrations
+- **SponsorBlock**: Skip sponsors
+- **ReturnYouTubeDislike**: Vote information
+- **LRCLIB**: Lyrics provider
+- **BetterLyrics**: Additional lyrics provider (added in v1.0.4)
+- **Sentry**: Crash reporting (Full version only)
+
+## 📝 Development Guidelines
+
+### Code Style
+- **Kotlin coding conventions**: Follow Kotlin official guidelines
+- **Compose best practices**: Single source of truth, unidirectional data flow
+- **Clean Architecture**: Strict layer separation, dependency rule
+
+### Module Dependencies
+```
+UI Layer (composeApp)
+    ↓
+Domain Layer (core/domain)
+    ↓
+Data Layer (core/data)
+    ↓
+Service Layer (core/service/*)
+    ↓
+Common (core/common)
+```
+
+**Dependency Rule**: Higher layer modules can only depend on lower layer modules, NOT vice versa.
+
+### Working with UI
+- Use **Jetpack Compose** for all new UI
+- Follow **Material Design 3** guidelines
+- State management with **StateFlow** or **State\<T>**
+- Side effects with **LaunchedEffect**, **DisposableEffect**
+
+### Working with Data
+- Repository pattern for all data operations
+- Use cases for complex business logic
+- Mapping between Data models ↔ Domain models ↔ UI models
+- Room for local persistence
+- Ktor for network requests
+
+### Research Before Implementation (MANDATORY)
+
+Before implementing code, researching code, or answering technical questions, the AI agent **MUST** follow this research workflow:
+
+#### Step 1: Look up official documentation
+- Use **MCP Context7** (`resolve-library-id` → `query-docs`) to fetch up-to-date documentation for any library/framework about to be used
+- Understand the latest API surface, breaking changes, and recommended usage patterns
+
+#### Step 2: Evaluate pros, cons, and alternatives
+- Use **WebSearch** to research:
+  - Pros and cons of the library/approach
+  - Alternative libraries or approaches that solve the same problem
+  - Known issues, performance concerns, or deprecation notices
+- Compare and evaluate whether the chosen library/approach is the best fit for this project
+
+#### Step 3: Study OSS best practices
+- Use **Grep** (on GitHub via web search) or **WebSearch** to find how well-known open-source projects implement similar features
+- Verify the approach follows established best practices before adopting it
+- Pay attention to patterns used in projects with similar architecture (Clean Architecture, Compose Multiplatform, etc.)
+
+#### Step 4: Make a decision and justify
+- Only proceed with implementation after completing steps 1-3
+- If a library/approach has significant drawbacks or better alternatives exist, recommend the better option to the user before proceeding
+- Document the rationale briefly when introducing new dependencies or patterns
+
+**This workflow applies to**: Adding new libraries, choosing architectural patterns, implementing new features with unfamiliar APIs, answering "how should we do X?" questions, and evaluating technical approaches.
+
+**This workflow does NOT apply to**: Simple bug fixes in existing code, minor refactoring, or tasks using libraries already well-established in the project.
+
+### Verification After Code Changes
+- **Do NOT build the app** to verify code changes. Instead, use **JetBrains MCP** tools (`get_file_problems`, `getDiagnostics`) to check for compile errors and warnings in real-time.
+- Only run Gradle build when explicitly requested by the user or for final release verification.
+
+### Testing
+- Unit tests for Domain layer (Use cases)
+- Repository tests with fake data sources
+- UI tests with Compose Testing
+
+## 🎯 Common Tasks
+
+### 1. Add New UI Feature
+**Location**: `composeApp/src/commonMain/kotlin/`
+- Create Composable function in appropriate package
+- Use ViewModel for state management
+- Follow Material 3 design patterns
+
+### 2. Add New API Endpoint
+**Location**: `core/service/kotlinYtmusicScraper/`
+- Implement endpoint in corresponding service
+- Create data model for response
+- Map to domain model
+
+### 3. Add New Database Entity
+**Location**: `core/data/src/main/java/.../database/`
+- Define Entity with Room annotations
+- Create DAO interface
+- Update Database class
+- Create migration if needed
+
+### 4. Add New Use Case
+**Location**: `core/domain/src/main/java/.../usecase/`
+- Create use case class
+- Inject repository dependencies
+- Implement business logic
+- Return Result/Flow
+
+### 5. Work with Media Playback
+**Location**: `core/media/media3/` (Android) or `core/media/media-jvm/` (Desktop)
+- Media3/ExoPlayer + CrossfadeExoPlayerAdapter for Android
+- libmpv (MpvPlayerAdapter / MpvPlayer / MpvLibrary) for Desktop
+- Queue management in `core/data/src/.../mediaservice/`
+- Playback controls
+
+### 6. Add New Lyrics Provider
+**Location**: `core/service/lyricsService/`
+- Implement lyrics fetcher interface
+- Add fallback logic
+- Handle synced/unsynced lyrics
+
+### 7. AI Features
+**Location**: `core/service/aiService/`
+- OpenAI integration
+- Gemini integration
+- AI lyrics translation
+- Song recommendations
+
+### 8. Add a New Icon
+
+**Location**: `composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/icon/`
+
+All icons are **Material Symbols Rounded** generated as Compose `ImageVector`s. There is no
+`material-icons-extended` dependency and no XML icon drawable — do not add either back.
+
+**Fetch it from Google's own generator** (it returns a ready `.kt` file, gzipped):
+
+```bash
+curl -sfL --compressed \
+  "https://fonts.gstatic.com/render/v1/Material+Symbols+Rounded/24dp/<symbol_name>.kt?var=opsz,wght,FILL,GRAD,ROND@24,400,1,0,50" \
+  -o <PascalName>.kt
+```
+
+Keep the axes identical for every icon so the set stays consistent: **Rounded, opsz 24, wght 400,
+GRAD 0, ROND 50**, `FILL=1`. Use `FILL=0` only for the "off" half of a state pair (e.g.
+`FavoriteBorder`, `AddCircleOutline`, `DownloadForOfflineOutlined`) — otherwise the empty and
+filled states render identically.
+
+**Then edit the downloaded file:**
+1. `package com.example.test` → `package com.maxrave.simpmusic.ui.icon`
+2. `public val <symbol_name>: ImageVector` → `val SimpIcons.<PascalName>: ImageVector`
+3. Rename the backing field `_<symbol_name>` → `_<PascalName>`, and `name = "<symbol_name>"` → `"<PascalName>"`
+4. For an icon that must flip in RTL, add `autoMirror = true,` to `ImageVector.Builder`
+
+**Use it:** `SimpIcons.PlayArrow` — plus a per-icon import, `import com.maxrave.simpmusic.ui.icon.PlayArrow`.
+
+#### Traps that have already cost time here
+
+- **Each icon needs its own import.** `val SimpIcons.X` is an *extension property*, so importing the
+  `SimpIcons` object alone does not bring it into scope. This is also what lets R8 drop unused icons —
+  do not "simplify" it into a map or a `when`, that would ship all of them.
+- **`ImageVector` is not a `Painter`.** `Icon`/`Image` have overloads for both, but `AsyncImage`
+  (`placeholder`/`error`), anything drawing inside a `DrawScope`, and custom composables typed
+  `Painter` do not — wrap with `rememberVectorPainter(SimpIcons.X)` there.
+- **The response is gzipped** even when the request asks for `identity`; decompress by magic bytes.
+- **Do not replace an icon whose colour carries meaning.** `baseline_downloaded.xml` (`#FF00A0CB`),
+  `baseline_favorite_24.xml` (`#D10000`), `mono.xml`, `monochrome.xml` and the `holder*.png`
+  placeholders stay as resources; a tinted neutral symbol is not equivalent.
+- Verify a name exists before assuming: the Symbols codepoint list is at
+  `google/material-design-icons` → `variablefont/MaterialSymbolsRounded[...].codepoints`. Legacy
+  names like `favorite_border` and `thumb_up_alt` do still exist; `person_add_alt_1` does not.
+
+## 📍 Important Files and Locations
+
+### Configuration
+- `build.gradle.kts` (root): Root build configuration
+- `gradle/libs.versions.toml`: Version catalog for dependencies
+- `settings.gradle.kts`: Module inclusion
+
+### Main Application
+- `composeApp/src/commonMain/kotlin/`: Shared Compose code
+- `composeApp/src/androidMain/kotlin/`: Android-specific code
+- `composeApp/src/desktopMain/kotlin/`: Desktop-specific code
+
+### Database
+- `core/data/src/main/java/.../database/`: Room database schemas
+- Migrations in Database class
+
+### Network
+- `core/service/kotlinYtmusicScraper/`: YouTube Music API
+- `core/service/spotify/`: Spotify API
+- `core/service/ktorExt/`: Ktor utilities
+
+### Resources
+- `composeApp/src/commonMain/composeResources/`: Shared resources
+- `composeApp/src/androidMain/res/`: Android resources
+- Crowdin integration for translations
+
+## 🔧 Build Variants
+
+### Android
+- **Full**: With Sentry crash reporting (module: `crashlytics`)
+- **FOSS**: No tracking (module: `crashlytics-empty`)
+
+### Desktop
+- **Windows**: `.msi` installer
+- **macOS**: `.dmg` (ARM and x86-64)
+- **Linux**: `.AppImage` (DEB and RPM removed post-1.0.4)
+
+## 🚨 Important Notes
+
+### Privacy & Data Collection
+- FOSS version: NO tracking
+- Full version: Only Sentry crash reporting
+- "Send back to Google" feature: Optional, only when user enables
+
+### Platform-specific Considerations
+
+#### Android
+- Min SDK: Check `androidApp/build.gradle.kts`
+- Target SDK: Latest stable
+- Android Auto support
+- Background playback with MediaSession
+
+#### Desktop
+- **Required Dependencies**:
+  - libmpv: audio + video playback (bundled via `mpvSetupAll`; falls back to a system-wide libmpv when `mpv-natives/` has not been staged)
+- **Minimum macOS: 15.0** — raised from 11.0 when VLC was replaced by mpv. mpv's macOS release builds target macOS 15 (96/98 arm64 dylibs declare `minos 15.0`; on Intel `libmpv` itself does), and Conveyor rejects a lower `LSMinimumSystemVersion`. No mpv artifact covers both architectures below 15.
+- **Features**:
+  - Deep link support (`simpmusic://` and `simpmusic.org`)
+  - Mini Player window (always-on-top, resizable, draggable)
+  - Crash dialog
+  - Custom title bar (disabled in VM environments)
+- **Limitations**:
+  - No offline playback
+
+### External APIs
+- YouTube Music: Hidden/unofficial API (may change anytime)
+- Spotify: Requires login for lyrics
+- OpenAI/Gemini: User must provide API key
+- SponsorBlock: Public API
+- LRCLIB: Public lyrics API
+
+## 🎵 Media Playback Architecture
+
+### Desktop Player (libmpv — replaced VLCJ 2026-07-27)
+
+**Location**: `core/media/media-jvm/src/main/java/com/simpmusic/media_jvm/mpv/`
+
+- `MpvLibrary.kt` — JNA binding for libmpv's C client API, hand-mapped against client API 2.x. Struct layouts are read by raw offset, so a MAJOR client-API bump needs them re-verified
+- `MpvPlayer.kt` — one handle per media item; `vo=libmpv` + software render context
+- `MpvVideoFrameSource.kt` — mpv SW render API → immutable `BufferedImage` snapshots published via `StateFlow`, drawn by plain Compose `Image` (`MpvVideoFrames` in `media-jvm-ui`); replaced the `SwingPanel`-embedded `MpvVideoSurfacePanel` on 2026-08-01
+- `MpvPlayerAdapter.kt` — the `MediaPlayerInterface` implementation; separate YouTube audio/video URLs are merged into ONE source with an `edl://...;!new_stream;...` URL (mpv's equivalent of Android's `MergingMediaSource`)
+- Natives bundled per platform in `mpv-natives/<os>-<arch>/`, staged by `mpvSetupAll` (Linux slice is compiled from source — `scripts/mpv-linux/`)
+- Supports crossfade transition with dual-player approach
+
+#### Crossfade Transition (Desktop)
+- Configurable duration: 1-15 seconds (default: 5 seconds)
+- Skipped when the NEXT track will play as video (`isVideo()` + watch-video setting on) — same rule as Android since 2026-08-01
+- Settings persisted via DataStore
+
+### Android Player (Media3/ExoPlayer)
+
+#### Crossfade & DJ-style Transition (added in v1.0.4)
+
+**Location**: `core/media/media3/src/main/java/com/maxrave/media3/exoplayer/CrossfadeExoPlayerAdapter.kt`
+
+- DJ-style crossfade with adjustable duration
+- Requires 320kbps stream preference to enable DJ mode
+- Auto crossfade mode (like AutoMix)
+- `CrossfadeFilterAudioProcessor` for audio processing
+- Edge cases: disabled for video, repeat one, last track
+
+## 🤝 Contributing
+
+### Code of Conduct
+See `CODE_OF_CONDUCT.md`
+
+### Pull Request Guidelines
+1. Fork and create branch from `dev`
+2. Follow coding conventions
+3. Test thoroughly before submitting
+4. Update documentation if needed
+5. PR title: Clear and descriptive
+6. PR description: Explain changes and reasoning
+
+### Translation
+- Use Crowdin: https://crowdin.com/project/simpmusic
+- Don't edit translation files directly
+
+## 📚 References
+
+### Inspiration & Credits
+- **InnerTune**: YouTube Music data extraction inspiration
+- **SmartTube**: YouTube streaming URL extraction
+- **SponsorBlock**: Sponsor skip functionality
+- **LRCLIB**: Lyrics provider
+
+### External Documentation
+- [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/)
+- [Material Design 3](https://m3.material.io/)
+- [Media3 (ExoPlayer)](https://developer.android.com/guide/topics/media/media3)
+- [Room Database](https://developer.android.com/training/data-storage/room)
+- [Ktor Client](https://ktor.io/docs/client.html)
+- [libmpv client API](https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h)
+- [mpv EDL format](https://github.com/mpv-player/mpv/blob/master/DOCS/edl-mpv.rst)
+
+### Community
+- Website: https://simpmusic.org
+- Discord: https://discord.gg/Rq5tWVM9Hg
+- GitHub Issues: Bug reports and feature requests
+
+---
+
+## 🎯 Quick Start for AI Agents
+
+When working with this project:
+
+1. **Always check layer dependencies**: Don't violate Clean Architecture rules
+2. **Use existing patterns**: Review current code to follow established patterns
+3. **Platform-aware**: Code in `commonMain` must work for both Android and Desktop
+4. **Test thoroughly**: Especially critical for media playback and network code
+5. **Consider privacy**: FOSS version must NOT have tracking
+6. **Check external API stability**: YouTube Music API may change at any time
+
+### When Encountering Issues
+- Check Discord server for known issues
+- Review recent commits and PRs
+- View dependency graph: `asset/dependencies_graph.svg`
+- Test on both Android and Desktop if code is in commonMain
+
+### Platform-Specific Code Patterns
+
+**Example: Desktop-only UI settings**
+```kotlin
+if (getPlatform() == Platform.Desktop) {
+    // Desktop-specific UI or logic
+}
+```
+
+**Example: Android-only features**
+```kotlin
+if (getPlatform() == Platform.Android) {
+    // Android-specific UI or logic
+}
+```
+
+## 📜 Changelog Summary (post-1.0.4)
+
+### Architecture Changes
+- **Desktop: GStreamer → VLCJ**: Completely replaced GStreamer with VLCJ for desktop audio playback
+- **DEB/RPM builds removed**: Desktop Linux now only ships AppImage
+
+### New Features (v1.0.4)
+- **Android Crossfade & DJ-style transition**: `CrossfadeExoPlayerAdapter` with auto mode (like AutoMix)
+- **BetterLyrics provider**: Additional lyrics source integrated into lyricsService
+- **320kbps audio stream option**: Higher quality streaming preference
+- **Parallel download**: Improved download speed
+- **Character-level animated lyrics**: Word-by-word lyrics with spring animations
+- **SimpMusic Chart**: Chart playlists integrated into Library screen
+- **Favorites**: Liked songs feature with UI integration
+- **Custom OpenAI base URL**: Support for compatible API endpoints
+
+### New Features (v1.0.1 - v1.0.3)
+- **Desktop Mini Player**: Always-on-top, resizable, draggable mini player window with volume/like controls
+- **Analytics/Local Tracking**: Track top artists, albums, and tracks locally (no remote tracking)
+- **Auto Backup**: Automatic backup settings
+- **Custom Title Bar**: Desktop window control with transparency support
+- **SimpMusic Lyrics voting**: Vote functionality for community lyrics
+
+### New Features (post-1.0.4, dev branch)
+- **Icons unified on Material Symbols (2026-08-03)**: `material-icons-core`/`material-icons-extended` are gone, and so are the XML icon drawables — every icon is now a generated `ImageVector` under `ui/icon/`, addressed as `SimpIcons.<Name>`. Two migrations fed into this: 59 icons replacing `Icons.*` (117 call sites), then 25 more replacing `painterResource(Res.drawable.baseline_*)` (167 call sites, 44 XML files deleted). `RippleIconButton`, `LiquidGlassIconButton` and `ActionButton` changed from taking `DrawableResource`/`Painter` to `ImageVector`. See **Common Tasks → Add a New Icon** for how to add one and which traps to avoid. Icons whose colour carries meaning (`baseline_downloaded`, `baseline_favorite_24`), the logos (`mono`, `monochrome`) and the `holder*` bitmaps deliberately stay as resources.
+- **Deep link support**: `simpmusic://` and `simpmusic.org` URL schemes
+- **Desktop Crash dialog**: Error reporting UI for desktop
+- **Playback speed/pitch controls**: Redesigned UI with improved animations
+- **VM environment detection**: Disable transparency and custom titlebar in VMs
+- **Google Cast (2026-07, Full build only)**: `cast`/`cast-empty` module pair gated by `isFullBuild`; unified Media3 `CastPlayer` wraps the session `ForwardingPlayer`; `CastHandoffManager` pushes resolved-URL queue windows to the receiver with 403/expiry retry; Cast button in Now Playing top bar, "Playing on <device>" pill, crossfade/DJ/EQ settings gray out while casting; FOSS build stays GMS-free
+- **Windows SMTC (2026-07)**: System Media Transport Controls on Windows via `jmtc`/`nowplayingcenter` 0.0.3 (forked JMTC). The native `SMTCAdapter.dll` was hardened against the 1.0.x crash (Sentry SIMPMUSIC-DESKTOP-7, ~95k events): COM apartment tolerates `RPC_E_CHANGED_MODE`, `MediaPlayer` kept alive process-wide, and every exported call is exception-guarded so nothing crosses the JNA boundary as "Invalid memory access". JMTC is confined to a dedicated thread (off the AWT EDT), and `MediaType.Music` is set before display properties so title/artist render (not just the app name). Enabled in `JvmMediaPlayerHandlerImpl` for `Platform.Windows` (Linux MPRIS unchanged; macOS uses NowPlayingCenter). DLL built by GitHub Actions (`windows-latest`) in the NowPlayingCenter repo.
+- **VLC removed entirely (2026-07-27)**: `VlcPlayerAdapter`, `DefaultVlcDiscoverer`, `MacOsVlcDiscoverer` and `VlcModule` are deleted; `VlcModule.kt` became `DesktopPlayerModule.kt` (`loadVlcModule()` → `loadDesktopPlayerModule()`). The `vlcj` dependency, the `vlc-setup` Gradle plugin, every `vlcSetup*` task, the `vlc-natives/` tree and the VLC Conveyor inputs are all gone. `appResourcesRootDir` now points at `mpv-natives/`. libmpv is the only desktop backend.
+- **Bundled libmpv (2026-07-27)**: two entry points, deliberately split. `:composeApp:mpvBundleAll` runs **on a Mac, once per mpv bump** — it turns upstream mpv builds into loadable slices in `mpv-natives/<os>-<arch>/`, packs them into tarballs and prints their SHA-256. Those are published to `maxrave-dev/simpmusic-files`. `:composeApp:mpvSetupAll` is what **CI** runs: it downloads those tarballs, verifies them against the digests pinned in `mpvNativesChecksums`, and unpacks them — no toolchain needed on the runner. Both workflows must call it before Conveyor, which is invoked by its own action and so never triggers the Gradle `dependsOn`.
+  - Sources: shinchiro `mpv-dev-*.7z` (Windows — the only one shipping a real `libmpv-2.dll`), mpv's own release `.zip` (macOS), and **for Linux a from-source container build** (see below). On macOS **libmpv is statically linked into the `mpv` executable**; that PIE binary exports the full client API and is renamed to `libmpv.dylib`, with load-command paths repointed to `@loader_path`.
+  - Do NOT lift `IINA.app/Contents/Frameworks` instead: IINA 1.4.4 ships a version-skewed pair (libmpv needs `_pl_log_create_349`, bundled `libplacebo.338.dylib` exports `_pl_log_create_338`) and that libmpv fails `dlopen` under both RTLD_NOW and RTLD_LAZY.
+  - **Every `._*` sidecar must be stripped after unpacking** (`mpvSetupAll` does this). Tarring a slice on macOS writes each file's xattrs out as a companion `._name`; Conveyor then signs them as ordinary bundle members and seals them in `_CodeSignature/CodeResources`, but macOS folds `._name` back into the xattrs of `name` and deletes the sidecar the moment Finder touches the app — unzipping it **or** dragging it out of the DMG. The launched bundle is then missing every sidecar the seal expects and Gatekeeper reports "SimpMusic is damaged and can't be opened" (`codesign --strict`: `a sealed resource is missing or invalid`). Only macOS is affected: it alone seals the whole app directory and re-checks it at launch.
+  - `MpvLibrary.bundledLibraryDirs()` resolves the staged folder: `mpv.bundled.path` → `compose.application.resources.dir` → `mpv/` found by walking up from the JAR → `mpv-natives/<os>-<arch>`.
+- **Linux libmpv built from source (2026-07-28)**: the AppImage route is gone — `scripts/mpv-linux/Dockerfile` now compiles libplacebo 7.351 + FFmpeg 7.1.1 + mpv 0.41.0 on **Ubuntu 22.04**, and `mpvSetupLinuxCi` runs that container and copies `/out`. This deleted ~186 lines of DwarFS extraction, closure pruning and rpath rewriting from `composeApp/build.gradle.kts`.
+  - **Why the AppImage could never work**: every prebuilt Linux mpv targets "run mpv as its own process". `mpv-AppImage` ships its own glibc + `ld-linux`, and its "libmpv.so.2" was really the `mpv` **PIE executable** — glibc refuses to `dlopen` a PIE outright (`DF_1_PIE`), and even patched past that, its glibc 2.43 collides with the one the JVM already mapped. It only ever appeared to work on dev machines because JNA silently fell back to a system-wide libmpv. **Always log the resolved path (`NativeLibrary.getInstance(name).file`)** — that is the only thing distinguishing "using the bundle" from "quietly using /usr/lib".
+  - The container build targets glibc **2.34** → runs on Ubuntu 22.04 / Debian 11 and newer. Vulkan/shaderc/glslang/D3D11 are disabled in libplacebo and X11/Wayland/GPU in mpv, since playback goes through the software render API; that also drops `libshaderc`/`libglslang`/`libSPIRV-Tools` (the bulk of the old bundle) and removes libsixel entirely, which had been aborting the JVM.
+  - `stage.sh` deliberately does **not** bundle `libc`/`libm`/`libstdc++`/`ld-linux`, sets `DT_RPATH` (not `DT_RUNPATH` — RUNPATH is not inherited by transitive dependencies), and fails the build unless a `dlopen` + `mpv_initialize` smoke test passes.
+  - mpv built with `-Dlua=disabled` has no `ytdl_hook`, so the `ytdl` option genuinely does not exist there; `MpvPlayer` uses `optionalOption()` to treat `MPV_ERROR_OPTION_NOT_FOUND` as success.
+- **Last.fm scrobbling (2026-07-30, Full build only)**: `lastfm`/`lastfm-empty` module pair gated by `isFullBuild`, following the `cast`/`crashlytics` shape. `LastfmScrobbler` (in `core/data/.../lastfm/`) lives in `commonMain` and is driven by both player handlers, because Android and Desktop run entirely separate ones. It sends `track.updateNowPlaying` where the Discord RPC is updated, and `track.scrobble` off the existing 5-second position-persist tick — a track over 30s scrobbles at half its length or 4 minutes, whichever comes first.
+  - **`status="ok"` does not mean accepted.** Last.fm answers OK while discarding a scrobble and only says so in `ignoredMessage`: code 1 = artist name filtered, 2 = track name filtered, 3/4 = timestamp too far past/future, 5 = daily limit. Codes 1 and 2 are how bad metadata surfaces, so they are logged loudly rather than dropped.
+  - **The two auth flows are not interchangeable, and picking the wrong one silently kills the callback.** Web flow: send the user to `last.fm/api/auth/?api_key=X` with no token; Last.fm mints it and redirects to the registered callback with `?token=`. Desktop flow: call `auth.getToken`, then open that URL with `&token=` already on it; Last.fm then shows "return to the application" and never redirects. SimpMusic uses the **web** flow because it has a registered callback and deep-link handlers on every platform.
+  - **The callback token does NOT travel through navigation.** `App.kt` hands it straight to `SharedViewModel.completeLastfmLogin()`, and `LastfmLoginScreen` closes itself by watching the stored session key. Navigating to the login screen with the token instead pushes a *second* copy on top of the one the user opened their browser from, so the `navigateUp()` after a successful login only peels off that copy and lands back on a login screen — it looks exactly like "logged in but still stuck on the login screen". The other three login screens never hit this because they embed a WebView and never leave the app; Desktop has no real WebView (`Cookies.jvm.kt` is a placeholder), which is why Last.fm uses the system browser at all.
+  - **`toSortedMap()` does not exist in common Kotlin** (it is a JDK collection) — sort the signature parameters with `entries.sortedBy { it.key }`.
+  - **`format` must be excluded from `api_sig`.** Parameters are sorted by name, concatenated `<name><value>`, secret appended, MD5'd — but signing `format` (or `callback`) yields "Invalid method signature supplied" (code 13) on every request.
+  - Error codes worth branching on: `9` invalid session key → clear the stored session and make the user log in again; `11`/`16`/`29` → transient, retryable; everything else is a malformed request.
+  - Two places where Last.fm's own docs contradict themselves, resolved conservatively: `timestamp` is the time the track **started** (the method page says started, the scrobbling guide says finished — every scrobbler in the wild sends the start), and `duration` is **always sent** (optional on one page, required on the other).
+  - Responses are parsed as loose `JsonObject`s, not `@Serializable` classes: Last.fm's JSON is a translation of its XML, so numbers arrive as strings, attributes hide under `@attr`, and a field is an object with one entry but an array with several.
+- **JNA open flags are POSIX-only (2026-07-28)**: `MpvLibrary` passes `OPTION_OPEN_FLAGS = 2` (RTLD_NOW without RTLD_GLOBAL) **only when not on Windows**. JNA forwards the value verbatim to `LoadLibraryEx`, where `2` means `LOAD_LIBRARY_AS_DATAFILE`: the DLL maps as plain data, imports never resolve, and `GetProcAddress` returns nothing — surfacing as the misleading `Error looking up function 'mpv_client_api_version': The specified module could not be found`.
+- **Desktop URL schemes were never actually registered (2026-07-31)**: `url-schemes` belongs at the **top level** of `app` in `conveyor.conf`. Conveyor binds it on `AppConfig`, not on `MacConfig`/`WindowsConfig`/`LinuxConfig` — compare `MacConfigAccess.getUrlSchemes()` (reads `appConfig`) with the `getFileAssociations()` beside it (reads `mac`). It had been written as `mac.url-schemes` / `windows.url-schemes` / `linux.url-schemes` since May 2026; HOCON accepts unknown keys silently, so all three sat inert and **every packaged build shipped with no `CFBundleURLTypes` at all** — macOS never routed `simpmusic://` either, not just the Last.fm callback. Proven by diffing two `mac-app` builds that differed only in where the key was written. The same misplacement had parked `desktop-file.Categories` / `Comment[en]` / `StartupWMClass` *beside* the `"Desktop Entry"` group instead of inside it, so those never reached the generated `.desktop` either. Two more links in the same chain: the argv filter in `runDesktopApp` matched a fixed list (`simpmusic://`, `http://`, `https://`) and therefore discarded `wordbyword://lastfm-auth?token=…` on Windows and Linux — it now matches any `scheme://` — and the AppImage's own `.desktop` (written by `packageConveyorAppImage`, which is what actually reaches users since AppRun installs it into `~/.local/share/applications`) now declares `x-scheme-handler/wordbyword` alongside `simpmusic`.
+- **Bundled glib disabled `java.awt.Desktop` on Linux (2026-07-31)**: `mpv-natives/linux-x64/lib/libglib-2.0.so.0` is glib 2.72 (built on Ubuntu 22.04) and is missing from `SYSTEM_LIBS` in `scripts/mpv-linux/stage.sh`, so it ships in the bundle and claims the glib soname the moment JNA loads libmpv at startup. AWT's `XDesktopPeer.init()` can then no longer dlopen the **system** `libgio-2.0.so.0`: on a glib 2.80 host (Ubuntu 24.04) it dies with `libgobject-2.0.so.0: undefined symbol: g_dir_unref`, and the JDK reports the whole Desktop API unsupported for the rest of the process. All 23 external-link call sites broke at once — `openUrl()` was an `if` with no `else` so it silently did nothing, while Compose's `LocalUriHandler` calls `Desktop.getDesktop()` on its first line and threw `UnsupportedOperationException` straight out of the click handler, crashing the app. Arrived with the from-source Linux mpv build (2026-07-28); before that JNA quietly fell back to a system-wide libmpv, so the system glib was the only one mapped and links worked. Worked around by calling `Desktop.isDesktopSupported()` at the top of `runDesktopApp` — `XDesktopPeer` caches that probe, so running it before libmpv loads lets the system gio/gobject win the soname race. `OpenUrl.jvm.kt` additionally gained a per-OS launcher fallback (`xdg-open` → `gio open` → `$BROWSER`) and a toast, so it can no longer fail in silence. **The actual cure is to stop bundling glib** — add it to `SYSTEM_LIBS`, which needs the Linux tarball rebuilt, republished and re-pinned in `mpvNativesChecksums`.
+
+- **Crossfade skips video tracks (2026-08-01)**: both `CrossfadeExoPlayerAdapter` (Android) and `MpvPlayerAdapter` (Desktop) skip the crossfade path when the NEXT track will play as video (`isVideo()` + watch-video setting on — the same condition that builds a merged audio+video source). The merged two-URL source is error-prone to prepare mid-fade and used to cut the outgoing song short or jump straight to the video at 0:00; such transitions now take the normal (non-crossfade) path. **Update 2026-08-05**: the CURRENT-track check — removed on Android in commit `9da155d7` because its old shape ignored the watch-video setting — is back on both platforms as `isCurrentTrackVideo()` (`watchVideoEnabled && isVideo()`, symmetric with `isNextTrackVideo()`), so a video also plays out to its last frame instead of fading out under the incoming song.
+- **Desktop video renders through Compose, SwingPanel removed (2026-08-01)**: `MpvVideoSurfacePanel` (JPanel + `SwingPanel` embedding) became `MpvVideoFrameSource` — the mpv SW render loop is unchanged, but finished frames are published as immutable `BufferedImage` snapshots on a `StateFlow` and drawn by a plain Compose `Image` (`MpvVideoFrames` in `media-jvm-ui`, converted with `toComposeImageBitmap()` off the UI thread; the UI reports its size via `setTargetSize()`). This kills the whole SwingPanel bug class: always-on-top z-order, one-frame-late repositioning while scrolling (the flicker that exposed the transparent window), and AWT's single-parent rule that made NowPlaying/Fullscreen/Artist screens fight over the one panel (video "randomly missing until next/prev"). `MpvPlayerAdapter.currentVideoSurface: StateFlow<Component?>` is now `currentVideoFrames: StateFlow<MpvVideoFrameSource?>` and is set unconditionally during crossfade — the old null-guard kept a dead panel from a released player on screen (the "black video" bug).
+- **macOS desktop audio moved to `ao=avfoundation` (2026-08-01)**: `MpvPlayer` now pins `ao` to `"avfoundation,"` when `Platform.isMac()`, because **`ao_coreaudio` leaks a process-wide CoreAudio listener onto a freed `struct ao`** and takes the whole JVM down the next time an audio device appears or disappears — Sentry-visible as `EXC_BAD_ACCESS` on the `HALC_ProxyNotification Call Listener Queue`, reproduced by simply plugging in headphones. Windows (wasapi) and Linux (pulse/pipewire) are untouched.
+  - The chain, all upstream and **still present in mpv master as of 0.41.0**: `ao_coreaudio.c` `init()` registers `AudioObjectAddPropertyListener(kAudioObjectSystemObject, …, hotplug_cb, (void *)ao)` on the *system* object, but its failure label is bare (`coreaudio_error: return CONTROL_ERROR;`). An init that fails any later step (`ca_init_chmap`, `init_audiounit`) therefore leaves the listener registered. `ao.c` then does `goto fail` → `ao_uninit()`, and `buffer.c`'s `ao_uninit()` calls `driver->uninit()` **only when `driver_initialized` is set** — a flag `ao.c` sets only *after* a successful init. So `unregister_hotplug_cb()` never runs while `talloc_free(ao)` does, and the orphaned listener outlives the handle for the rest of the process.
+  - **Why SimpMusic hits this and plain mpv does not**: mpv initialises one ao per session; SimpMusic creates one handle per media item and runs two at once during a crossfade, so a single failed audio init anywhere in a session arms the crash. The crash then waits for an unrelated hotplug event, which is why the process can look healthy for an hour first.
+  - Diagnosing it: the faulting address decodes as ASCII (`0x65636e6174736e49` = "Instance"), the signature of a freed allocation already handed to another object. No thread was tearing an ao down at crash time, which is what ruled out a teardown race and pointed at a listener leaked much earlier.
+  - Accepted trade-offs, neither reproducible in testing on macOS 27: delayed mute (mpv#15014) and audio desync on playback-speed changes (mpv#14483). The trailing comma in `"avfoundation,"` keeps mpv's auto-probe as a fallback, so a failure degrades audio instead of silencing it. Remove the whole workaround once upstream frees the listener on the error path.
+  - Related blind spot, still open: nothing calls `mpv_request_log_messages()`, so libmpv's own warnings (including failed audio init) never surface anywhere.
+
+## 🔄 CLAUDE.md Auto-Update Rule (MANDATORY)
+
+After completing any of the following types of changes, the AI agent **MUST** update this CLAUDE.md file:
+
+1. **Architecture changes**: Module additions/removals, dependency changes (e.g., library swaps like GStreamer → VLCJ), build system changes
+2. **New major features**: New modules, new service integrations, new platform capabilities
+3. **API/Technology migrations**: Swapping core libraries, changing data flow patterns
+4. **Build/CI changes**: New build variants, changed packaging formats, CI workflow changes
+5. **Module structure changes**: Adding/removing modules in settings.gradle.kts
+
+**What to update**:
+- Relevant sections in this document (Module Structure, Key Technologies, etc.)
+- Add entry to Changelog Summary section with date/version context
+- Update "Last updated" date at the bottom
+
+**What NOT to update for**:
+- Bug fixes, minor UI tweaks, translation updates
+- Simple refactoring within existing patterns
+- Dependency version bumps without API changes
+
+---
+
+*This document helps AI Agents quickly understand the SimpMusic project. Update regularly when there are major changes to architecture or structure.*
+
+**Last updated**: 2026-08-05
+**Project version**: Check latest release on GitHub
+**Maintained by**: maxrave-dev and contributors
