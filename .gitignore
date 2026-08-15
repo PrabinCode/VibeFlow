@@ -17,8 +17,9 @@ local.properties
 crowdin.yml
 # Kotlin 2.0
 .kotlin/
-.idea
 /simpmusic.jks
+*.keystore
+*.jks
 /ffmpeg-kit/build/
 
 #dev files
