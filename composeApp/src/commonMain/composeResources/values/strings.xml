@@ -121,13 +121,13 @@
     <string name="about_us">About us</string>
     <string name="version">Version</string>
     <string name="github">Github</string>
-    <string name="maxrave_dev">maxrave-dev</string>
-    <string name="buy_me_a_coffee">Buy me a coffee</string>
-    <string name="developer_blog">Developer Blog</string>
-    <string name="developer_blog_tagline">Read dev notes, tutorials &amp; behind-the-scenes</string>
-    <string name="blog_promo_title">Something new from the dev</string>
-    <string name="blog_promo_message">I just launched my personal blog at maxrave.dev — sharing the story behind SimpMusic, music-tech deep dives, and engineering notes. Give it a read if you're curious ✨</string>
-    <string name="visit_blog">Visit blog</string>
+    <string name="maxrave_dev">Prabin Chandra Shrestha</string>
+    <string name="buy_me_a_coffee">Support Project</string>
+    <string name="developer_blog">Developer Website</string>
+    <string name="developer_blog_tagline">pcshrestha.com.np • Portfolio &amp; Engineering</string>
+    <string name="blog_promo_title">From the developer</string>
+    <string name="blog_promo_message">Explore engineering notes, architecture patterns, and portfolio at pcshrestha.com.np ✨</string>
+    <string name="visit_blog">Visit Website</string>
     <string name="paypal">PayPal</string>
     <string name="title">Title</string>
     <string name="custom_order">Custom order</string>
@@ -283,9 +283,9 @@
     <string name="older_first">Older First</string>
     <string name="newer_first">Newer First</string>
     <string name="added_date">Added date</string>
-    <string name="credit_app">A simple music app using YouTube Music for backend \n\nSimpMusic is an open source project to stream music from YouTube and YouTube Music without ads and tracking. SimpMusic provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nSimpMusic is always free and no ads\n\nBuild with ❤️ from Tuan Minh Nguyen Duc (maxrave-dev)</string>
+    <string name="credit_app">A modern music streaming app using YouTube Music for backend \n\nVibeFlow is an open source project to stream music from YouTube and YouTube Music without ads and tracking. VibeFlow provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nVibeFlow is always free and no ads\n\nMaintained with ❤️ by Prabin Chandra Shrestha (PrabinCode)\nOriginal project: SimpMusic by maxrave-dev</string>
     <string name="issue_tracker">Issue Tracker</string>
-    <string name="copyright" translatable="false">©2023-2025 Tuan Minh Nguyen Duc (maxrave-dev)</string>
+    <string name="copyright" translatable="false">© 2026 Prabin Chandra Shrestha (VibeFlow). Upstream © 2023-2025 maxrave-dev (SimpMusic)</string>
     <string name="featured_playlists">Featured Playlists</string>
     <string name="podcasts" translatable="false">Podcasts</string>
     <string name="featured_inArtist">Featured on</string>
