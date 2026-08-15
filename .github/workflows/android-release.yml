@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - 'main'
+    tags:
+      - 'v*'
     paths-ignore:
       - 'README.md'
       - 'fastlane/**'
@@ -54,8 +56,10 @@ jobs:
       - name: Update environment variables
         env:
           BASE_64_SIGNING_KEY: ${{ secrets.BASE_64_SIGNING_KEY }}
-        run:
-          echo $BASE_64_SIGNING_KEY | base64 -d > simpmusic.jks
+        run: |
+          if [ -n "$BASE_64_SIGNING_KEY" ]; then
+            echo "$BASE_64_SIGNING_KEY" | base64 -d > simpmusic.jks
+          fi
 
       - name: Update build product flavor
         run: |
@@ -96,8 +100,10 @@ jobs:
       - name: Update environment variables
         env:
           BASE_64_SIGNING_KEY: ${{ secrets.BASE_64_SIGNING_KEY }}
-        run:
-          echo $BASE_64_SIGNING_KEY | base64 -d > simpmusic.jks
+        run: |
+          if [ -n "$BASE_64_SIGNING_KEY" ]; then
+            echo "$BASE_64_SIGNING_KEY" | base64 -d > simpmusic.jks
+          fi
 
       - name: Update build product flavor
         run: |
@@ -136,82 +142,22 @@ jobs:
           cache: 'gradle'
 
       - name: Install libfuse2
-        # Needed by appimagetool when wrapping the Linux app. Nothing else is
-        # required here: mpvSetupAll only downloads and untars the prebuilt
-        # native slices, so no 7-Zip, patchelf or dwarfs toolchain on the runner.
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Prepopulate Conveyor release cache with mpv archives
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libfuse2
+          mkdir -p ~/.gradle/caches/conveyor/https/github.com/maxrave-dev/mpv-build-autobuilds/releases/download/2026-03-31-03-31/
+          cp mpv-natives/mpv-linux-x86_64-v3-*.tar.gz ~/.gradle/caches/conveyor/https/github.com/maxrave-dev/mpv-build-autobuilds/releases/download/2026-03-31-03-31/ 2>/dev/null || true
+          cp mpv-natives/mpv-mac-x86_64-*.tar.gz ~/.gradle/caches/conveyor/https/github.com/maxrave-dev/mpv-build-autobuilds/releases/download/2026-03-31-03-31/ 2>/dev/null || true
+          cp mpv-natives/mpv-mac-aarch64-*.tar.gz ~/.gradle/caches/conveyor/https/github.com/maxrave-dev/mpv-build-autobuilds/releases/download/2026-03-31-03-31/ 2>/dev/null || true
+          cp mpv-natives/mpv-windows-x86_64-*.zip ~/.gradle/caches/conveyor/https/github.com/maxrave-dev/mpv-build-autobuilds/releases/download/2026-03-31-03-31/ 2>/dev/null || true
 
-      - name: Update build product flavor
-        run: |
-          echo "" >> ./gradle.properties
-          echo "isFullBuild=true" >> ./gradle.properties
+      - name: Build and stage native libraries
+        run: ./gradlew :desktopApp:mpvSetupAll --no-configuration-cache
 
-      - name: Update Sentry Secrets
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN_JVM }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          echo 'SENTRY_DSN=${{ secrets.SENTRY_DSN_JVM }}' > ./local.properties
-          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" >> ./local.properties
-
-      - name: Update Last.fm secrets
-        env:
-          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
-          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
-        run: |
-          echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" >> ./local.properties
-          echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> ./local.properties
-
-      - name: Generate aboutLibraries.json
-        run: ./gradlew exportLibraryDefinitions
-
-      - name: Cache mpv-natives
-        uses: actions/cache@v4
-        with:
-          path: mpv-natives
-          key: mpv-natives-${{ hashFiles('composeApp/build.gradle.kts') }}
-
-      - name: Populate mpv-natives for all OSes
-        # Conveyor is invoked by its own action further down, NOT through Gradle,
-        # so the dependsOn(":composeApp:mpvSetupAll") wired into the conveyor*
-        # tasks never fires on this path — the natives have to be staged here
-        # explicitly or the installers ship without libmpv.
-        run: ./gradlew :composeApp:mpvSetupAll --no-configuration-cache
-
-      - name: Generate Conveyor config
-        # Run writeConveyorConfig BEFORE Conveyor so the parser only reads
-        # the static generated.conveyor.conf and never tastes Gradle stdout
-        # (which can contain plugin println output and break HOCON parsing).
-        run: ./gradlew :desktopApp:writeConveyorConfig --no-configuration-cache
-
-      # Linux first: `make linux-app` emits the unpacked tree under output/
-      # that our packageConveyorAppImage task wraps into a portable AppImage.
-      # Conveyor 22.0 dropped native AppImage support, hence the wrap.
-      - name: Run Conveyor (linux-app)
-        uses: hydraulic-software/conveyor/actions/build@v22.0
-        with:
-          command: -Kapp.machines=linux.amd64.glibc make linux-app
-          agree_to_license: 1
-          signing_key: ${{ secrets.CONVEYOR_SIGNING_KEY }}
-
-      - name: Wrap Linux app tree → AppImage
+      - name: Build Linux AppImage
         run: ./gradlew :desktopApp:packageConveyorAppImage --no-configuration-cache
 
-      # `make site` builds every machine that has non-empty targets +
-      # `.appinstaller`, `.exe` wrapper, and the download.html landing
-      # page. Conveyor wipes output/ at the start, so it does NOT clobber
-      # the AppImage we already wrapped (that lives under
-      # desktopApp/build/appimage/).
-      #
-      # `-Kapp.machines=...` restricts the site build to Mac + Windows.
-      # Linux is excluded because we already produced the AppImage in
-      # the previous step. Without this restriction, `make site` re-
-      # enters Conveyor's Linux tarball pipeline as an intermediate even
-      # when `linux.amd64.targets = []`, and that intermediate fails the
-      # build with "Linux Tarball Contents for Intel" before the Mac /
-      # Windows artifacts get a chance to run.
       - name: Run Conveyor (make site, Mac + Windows only)
         uses: hydraulic-software/conveyor/actions/build@v22.0
         with:
@@ -220,7 +166,9 @@ jobs:
           signing_key: ${{ secrets.CONVEYOR_SIGNING_KEY }}
 
       - name: Stage AppImage into output/ for upload
-        run: cp desktopApp/build/appimage/conveyor/SimpMusic-*.AppImage output/
+        run: |
+          mkdir -p output/
+          cp desktopApp/build/appimage/conveyor/*.AppImage output/ 2>/dev/null || true
 
       - name: Show built artifacts
         run: ls -lh output/
@@ -229,7 +177,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-appimage
-          path: output/SimpMusic-*.AppImage
+          path: output/*.AppImage
 
       - name: Upload macOS zips to run artifacts
         uses: actions/upload-artifact@v4
@@ -237,17 +185,6 @@ jobs:
           name: desktop-mac-zips
           path: output/*.zip
 
-      # Bundle Windows installer = install.bat + simpmusic.crt + msix.
-      # Conveyor's default .exe wrapper + .appinstaller fetch URLs from
-      # `site.base-url` (GitHub Releases /latest/download/) which 404 for
-      # unreleased builds, so we ship our own scripts/windows/install.bat
-      # that trusts the cert and sideloads the msix offline — no network
-      # round-trip, double-click works, UAC self-elevates.
-      #
-      # Only x64 is shipped — windows.aarch64 is dropped because
-      # androidx.sqlite-bundled lacks a Windows ARM64 native (see
-      # conveyor.conf for full context). ARM Windows users get the x64
-      # msix running under Prism emulation, which works correctly.
       - name: Bundle Windows offline installer
         run: |
           set -euo pipefail
@@ -255,9 +192,9 @@ jobs:
             echo "::error::output/simpmusic.crt missing — Conveyor signing must have failed"
             exit 1
           fi
-          msix=$(ls output/simpmusic-*.x64.msix 2>/dev/null | head -1)
+          msix=$(ls output/*.msix 2>/dev/null | head -1)
           if [ -z "$msix" ]; then
-            echo "::error::No simpmusic-*.x64.msix found in output/"
+            echo "::error::No .msix found in output/"
             exit 1
           fi
           mkdir -p installers/
@@ -266,7 +203,7 @@ jobs:
           cp output/simpmusic.crt        "$stage/"
           cp "$msix"                      "$stage/"
           ( cd "$stage" && zip -q -j \
-            "${GITHUB_WORKSPACE}/installers/SimpMusic-Windows-installer.zip" \
+            "${GITHUB_WORKSPACE}/installers/VibeFlow-Windows-installer.zip" \
             install.bat simpmusic.crt "$(basename "$msix")" )
           rm -rf "$stage"
           ls -lh installers/
@@ -275,7 +212,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows
-          path: installers/SimpMusic-Windows-installer.zip
+          path: installers/VibeFlow-Windows-installer.zip
 
   wrap-mac-dmg:
     name: Wrap macOS .zip → .dmg (installer UX)
@@ -288,9 +225,6 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install create-dmg + ImageMagick
-        # create-dmg = sindresorhus brew formula. ImageMagick is used to
-        # downscale the 2800x1600 source background to a sharp 1400x800
-        # bitmap using a Lanczos filter (matches the DMG window size).
         run: brew install create-dmg imagemagick
 
       - name: Read app version
@@ -320,14 +254,14 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           shopt -s nullglob
-          for zip in mac-zips/simpmusic-*-mac-*.zip; do
+          for zip in mac-zips/*.zip; do
             arch="$(basename "$zip" | sed -nE 's/.*-mac-([a-z0-9]+)\.zip/\1/p')"
-            [[ -z "$arch" ]] && { echo "Cannot infer arch from $zip" >&2; exit 1; }
+            [[ -z "$arch" ]] && arch="universal"
             workdir="$(mktemp -d)"
             unzip -q "$zip" -d "$workdir"
             app="$(find "$workdir" -maxdepth 2 -type d -name '*.app' | head -1)"
             [[ -d "$app" ]] || { echo "No .app inside $zip" >&2; exit 1; }
-            out="dist/SimpMusic-${VERSION}-mac-${arch}.dmg"
+            out="dist/VibeFlow-${VERSION}-mac-${arch}.dmg"
             scripts/wrap-mac-dmg.sh \
               "$app" \
               build/dmg/dmg-bg-1400x800.png \
@@ -342,3 +276,91 @@ jobs:
         with:
           name: desktop-mac-dmg
           path: dist/*.dmg
+
+  publish-release:
+    name: Publish to GitHub Releases
+    runs-on: ubuntu-latest
+    needs: [build-full-release, build-foss-release, build-desktop-packages, wrap-mac-dmg]
+    if: always() && (needs.build-full-release.result == 'success' || needs.build-foss-release.result == 'success')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read app version
+        id: version
+        run: |
+          VERSION=$(grep '^version-name' gradle/libs.versions.toml | head -1 | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: $VERSION"
+
+      - name: Create release directory
+        run: mkdir -p release_files
+
+      - name: Download Full APK artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: app-full-release
+          path: release_files/
+
+      - name: Download FOSS APK artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: app-foss-release
+          path: release_files/
+
+      - name: Download Desktop AppImage
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: desktop-appimage
+          path: release_files/
+
+      - name: Download Desktop Windows Installer
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: desktop-windows
+          path: release_files/
+
+      - name: Download Desktop Mac DMG
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: desktop-mac-dmg
+          path: release_files/
+
+      - name: Generate Checksums
+        working-directory: release_files
+        run: |
+          ls -lh
+          sha256sum * > SHA256SUMS.txt 2>/dev/null || true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.version.outputs.version) }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || format('VibeFlow v{0}', steps.version.outputs.version) }}
+          body: |
+            ## 🎵 VibeFlow v${{ steps.version.outputs.version }}
+            
+            A modern, open-source YouTube Music client for Android & Desktop built with Compose Multiplatform.
+            
+            ### 📱 Android Downloads:
+            * **FOSS Release (`.apk`)**: Recommended build without proprietary trackers.
+            * **Full Release (`.apk`)**: Standard release build.
+            
+            ### 💻 Desktop Downloads:
+            * **Windows**: Download `VibeFlow-Windows-installer.zip`, extract, and run `install.bat`.
+            * **macOS**: Download `VibeFlow-...-mac-*.dmg` for Apple Silicon / Intel.
+            * **Linux**: Download `.AppImage` (`chmod +x *.AppImage` and run).
+            
+            ---
+            *Maintained with ❤️ by **Prabin Chandra Shrestha** ([pcshrestha.com.np](https://pcshrestha.com.np))*  
+            *Based on upstream [SimpMusic](https://github.com/maxrave-dev/SimpMusic) under GPL-3.0.*
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: release_files/*
+          fail_on_unmatched_files: false

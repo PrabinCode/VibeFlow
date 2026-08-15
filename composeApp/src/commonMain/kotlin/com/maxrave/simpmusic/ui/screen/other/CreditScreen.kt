@@ -173,6 +173,20 @@ fun CreditScreen(
                 Text(text = stringResource(Res.string.issue_tracker))
             }
 
+            // Upstream open-source project credit button
+            TextButton(
+                onClick = {
+                    openUrl("https://github.com/maxrave-dev/SimpMusic")
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.Start)
+                        .padding(horizontal = 25.dp)
+                        .defaultMinSize(minHeight = 1.dp, minWidth = 1.dp),
+            ) {
+                Text(text = stringResource(Res.string.upstream_project))
+            }
+
             // Support project button
             TextButton(
                 onClick = {

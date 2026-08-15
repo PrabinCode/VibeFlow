@@ -6,26 +6,24 @@ set -e
 # Default variables
 BUILD_TYPE="release"
 BUILD_VARIANT="full"
-KEYSTORE_PATH="./simpmusic.jks"
-# Read passwords from environment variables or use default (for backward compatibility)
+KEYSTORE_PATH="${KEYSTORE_PATH:-./simpmusic.jks}"
 KEYSTORE_PASSWORD="${KEYSTORE_PASSWORD}"
 KEY_ALIAS="${KEY_ALIAS}"
 KEY_PASSWORD="${KEY_PASSWORD}"
 
-# Check if KEY_PASSWORD is set
-if [ -z "$KEY_PASSWORD" ]; then
-  echo "Error: KEY_PASSWORD environment variable must be set"
-  exit 1
-fi
-
-if [ -z "$KEYSTORE_PASSWORD" ]; then
-  echo "Error: KEYSTORE_PASSWORD environment variable must be set"
-  exit 1
-fi
-
-if [ -z "$KEY_ALIAS" ]; then
-  echo "Error: KEY_ALIAS environment variable must be set"
-  exit 1
+# Fallback: Auto-generate a valid release keystore if secrets are not supplied or keystore file is missing
+if [ -z "$KEY_PASSWORD" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ ! -s "$KEYSTORE_PATH" ]; then
+  echo "[Keystore] Missing or empty keystore/passwords. Generating a release keystore on the fly..."
+  KEYSTORE_PATH="./vibeflow_release.jks"
+  KEYSTORE_PASSWORD="vibeflow_release_pass"
+  KEY_ALIAS="vibeflow"
+  KEY_PASSWORD="vibeflow_release_pass"
+  if [ ! -f "$KEYSTORE_PATH" ]; then
+    keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
+      -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" \
+      -dname "CN=VibeFlow, OU=OpenSource, O=VibeFlow, L=Kathmandu, ST=Bagmati, C=NP"
+    echo "[Keystore] Generated $KEYSTORE_PATH successfully."
+  fi
 fi
 
 
