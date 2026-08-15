@@ -20,7 +20,19 @@ echo "===================="
 echo "Building VibeFlow APK ($BUILD_VARIANT - $BUILD_TYPE)"
 echo "===================="
 
-# Step 1: Clean and build with Gradle (Gradle handles native signing, zipalign & optimization)
+# Ensure release.keystore exists before assembling
+if [ ! -f "release.keystore" ] && [ ! -f "simpmusic.jks" ] && [ ! -f "keystore.jks" ] && [ ! -f "vibeflow.jks" ]; then
+  echo "[Keystore] Auto-generating release.keystore..."
+  keytool -genkeypair -v \
+    -keystore release.keystore \
+    -alias "${KEY_ALIAS:-vibeflow}" \
+    -keyalg RSA -keysize 2048 -validity 10000 \
+    -storepass "${KEYSTORE_PASSWORD:-vibeflowpass}" \
+    -keypass "${KEY_PASSWORD:-vibeflowpass}" \
+    -dname "CN=VibeFlow, OU=OpenSource, O=VibeFlow, C=NP"
+fi
+
+# Clean and build with Gradle
 ./gradlew clean --no-configuration-cache
 ./gradlew :androidApp:assembleRelease --no-configuration-cache
 

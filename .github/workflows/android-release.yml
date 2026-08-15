@@ -53,12 +53,23 @@ jobs:
           echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" >> ./local.properties
           echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> ./local.properties
 
-      - name: Update environment variables
+      - name: Setup Keystore
         env:
           BASE_64_SIGNING_KEY: ${{ secrets.BASE_64_SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$BASE_64_SIGNING_KEY" ]; then
-            echo "$BASE_64_SIGNING_KEY" | base64 -d > simpmusic.jks
+            echo "$BASE_64_SIGNING_KEY" | base64 -d > release.keystore
+          else
+            keytool -genkeypair -v \
+              -keystore release.keystore \
+              -alias "${KEY_ALIAS:-vibeflow}" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "${KEYSTORE_PASSWORD:-vibeflowpass}" \
+              -keypass "${KEY_PASSWORD:-vibeflowpass}" \
+              -dname "CN=VibeFlow, OU=OpenSource, O=VibeFlow, C=NP"
           fi
 
       - name: Update build product flavor
@@ -97,12 +108,23 @@ jobs:
           distribution: "temurin"
           cache: 'gradle'
 
-      - name: Update environment variables
+      - name: Setup Keystore
         env:
           BASE_64_SIGNING_KEY: ${{ secrets.BASE_64_SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$BASE_64_SIGNING_KEY" ]; then
-            echo "$BASE_64_SIGNING_KEY" | base64 -d > simpmusic.jks
+            echo "$BASE_64_SIGNING_KEY" | base64 -d > release.keystore
+          else
+            keytool -genkeypair -v \
+              -keystore release.keystore \
+              -alias "${KEY_ALIAS:-vibeflow}" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "${KEYSTORE_PASSWORD:-vibeflowpass}" \
+              -keypass "${KEY_PASSWORD:-vibeflowpass}" \
+              -dname "CN=VibeFlow, OU=OpenSource, O=VibeFlow, C=NP"
           fi
 
       - name: Update build product flavor

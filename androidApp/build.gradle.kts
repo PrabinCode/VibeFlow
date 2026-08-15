@@ -81,25 +81,43 @@ android {
 
     signingConfigs {
         create("release") {
-            val keyStoreFile = project.rootProject.file("simpmusic.jks").takeIf { it.exists() }
+            val keyStoreFile = project.rootProject.file("release.keystore").takeIf { it.exists() }
+                ?: project.rootProject.file("simpmusic.jks").takeIf { it.exists() }
                 ?: project.rootProject.file("keystore.jks").takeIf { it.exists() }
                 ?: project.rootProject.file("vibeflow.jks").takeIf { it.exists() }
-                ?: project.rootProject.file("vibeflow_release.jks")
-            if (keyStoreFile.exists()) {
-                val properties = Properties()
+                ?: project.rootProject.file("release.keystore")
+
+            if (!keyStoreFile.exists()) {
                 try {
-                    properties.load(rootProject.file("local.properties").inputStream())
+                    val keytoolBin = if (System.getProperty("os.name").lowercase().contains("windows")) "keytool.exe" else "keytool"
+                    val pb = ProcessBuilder(
+                        keytoolBin, "-genkeypair", "-v",
+                        "-keystore", keyStoreFile.absolutePath,
+                        "-alias", "vibeflow",
+                        "-keyalg", "RSA",
+                        "-keysize", "2048",
+                        "-validity", "10000",
+                        "-storepass", "vibeflowpass",
+                        "-keypass", "vibeflowpass",
+                        "-dname", "CN=VibeFlow, OU=OpenSource, O=VibeFlow, C=NP"
+                    ).inheritIO().start()
+                    pb.waitFor()
                 } catch (_: Exception) {}
-                storeFile = keyStoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                    ?: properties.getProperty("KEYSTORE_PASSWORD", "android")
-                keyAlias = System.getenv("KEY_ALIAS")
-                    ?: properties.getProperty("KEY_ALIAS", "androiddebugkey")
-                keyPassword = System.getenv("KEY_PASSWORD")
-                    ?: properties.getProperty("KEY_PASSWORD", "android")
-            } else {
-                initWith(getByName("debug"))
             }
+
+            storeFile = keyStoreFile
+            val properties = Properties()
+            try {
+                properties.load(rootProject.file("local.properties").inputStream())
+            } catch (_: Exception) {}
+
+            val envStorePass = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+            val envAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+            val envKeyPass = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+
+            storePassword = envStorePass ?: properties.getProperty("KEYSTORE_PASSWORD", "vibeflowpass")
+            keyAlias = envAlias ?: properties.getProperty("KEY_ALIAS", "vibeflow")
+            keyPassword = envKeyPass ?: properties.getProperty("KEY_PASSWORD", "vibeflowpass")
         }
     }
 
