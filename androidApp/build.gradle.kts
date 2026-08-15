@@ -81,16 +81,22 @@ android {
 
     signingConfigs {
         create("release") {
-            val keyStoreFile = project.rootProject.file("keystore.jks")
+            val keyStoreFile = project.rootProject.file("simpmusic.jks").takeIf { it.exists() }
+                ?: project.rootProject.file("keystore.jks").takeIf { it.exists() }
+                ?: project.rootProject.file("vibeflow.jks").takeIf { it.exists() }
+                ?: project.rootProject.file("vibeflow_release.jks")
             if (keyStoreFile.exists()) {
                 val properties = Properties()
                 try {
                     properties.load(rootProject.file("local.properties").inputStream())
                 } catch (_: Exception) {}
                 storeFile = keyStoreFile
-                storePassword = properties.getProperty("KEYSTORE_PASSWORD", "android")
-                keyAlias = properties.getProperty("KEY_ALIAS", "androiddebugkey")
-                keyPassword = properties.getProperty("KEY_PASSWORD", "android")
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                    ?: properties.getProperty("KEYSTORE_PASSWORD", "android")
+                keyAlias = System.getenv("KEY_ALIAS")
+                    ?: properties.getProperty("KEY_ALIAS", "androiddebugkey")
+                keyPassword = System.getenv("KEY_PASSWORD")
+                    ?: properties.getProperty("KEY_PASSWORD", "android")
             } else {
                 initWith(getByName("debug"))
             }
