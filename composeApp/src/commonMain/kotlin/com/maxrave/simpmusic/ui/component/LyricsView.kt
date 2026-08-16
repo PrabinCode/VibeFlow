@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -43,6 +45,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,6 +80,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -99,6 +104,7 @@ import com.maxrave.simpmusic.extension.parseRichSyncWords
 import com.maxrave.simpmusic.ui.icon.Info
 import com.maxrave.simpmusic.ui.icon.MoreVert
 import com.maxrave.simpmusic.ui.icon.QueueMusic
+import com.maxrave.simpmusic.ui.icon.Share
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.theme.typo
@@ -113,6 +119,10 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.crossfading
+import simpmusic.composeapp.generated.resources.select_lines_hint
+import simpmusic.composeapp.generated.resources.select_lyrics_to_share
+import simpmusic.composeapp.generated.resources.share_lyrics
+import simpmusic.composeapp.generated.resources.share_quote_card
 import simpmusic.composeapp.generated.resources.unavailable
 import kotlin.math.PI
 import kotlin.math.abs
@@ -245,6 +255,9 @@ fun LyricsView(
     showScrollShadows: Boolean = false,
     backgroundColor: Color = Color(0xFF242424),
     dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
+    isShareMode: Boolean = false,
+    selectedLineIndexes: Set<Int> = emptySet(),
+    onToggleSelectLine: ((Int) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     val current by timeLine.collectAsStateWithLifecycle()
@@ -277,8 +290,8 @@ fun LyricsView(
                 thresholdMs = 1000L,
             )
         }
-    LaunchedEffect(currentLineIndex, lyricsData.lyrics.syncType) {
-        if (currentLineIndex > -1 &&
+    LaunchedEffect(currentLineIndex, lyricsData.lyrics.syncType, isShareMode) {
+        if (!isShareMode && currentLineIndex > -1 &&
             (lyricsData.lyrics.syncType == "LINE_SYNCED" || lyricsData.lyrics.syncType == "RICH_SYNCED")
         ) {
             listState.animateScrollAndCentralizeItem(currentLineIndex)
@@ -292,6 +305,7 @@ fun LyricsView(
         ) {
             items(lyricsData.lyrics.lines?.size ?: 0) { index ->
                 val line = lyricsData.lyrics.lines?.getOrNull(index)
+                val isSelected = index in selectedLineIndexes
                 // Translated lyrics: synced -> precomputed map by line index, unsynced -> by index.
                 val translatedWords =
                     if (lyricsData.lyrics.syncType == "LINE_SYNCED" || lyricsData.lyrics.syncType == "RICH_SYNCED") {
@@ -305,6 +319,15 @@ fun LyricsView(
                     }
 
                 line?.words?.let { words ->
+                    val clickAction: () -> Unit = {
+                        if (isShareMode) {
+                            onToggleSelectLine?.invoke(index)
+                        } else {
+                            val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
+                            onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
+                        }
+                    }
+
                     when {
                         // Rich sync: parse and use RichSyncLyricsLineItem
                         lyricsData.lyrics.syncType == "RICH_SYNCED" -> {
@@ -320,12 +343,8 @@ fun LyricsView(
                                     translatedWords = translatedWords,
                                     currentTimeMs = (current.current + lyricsOffset).coerceAtLeast(0L),
                                     isCurrent = index == currentLineIndex,
-                                    modifier =
-                                        Modifier
-                                            .clickable {
-                                                val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
-                                                onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
-                                            },
+                                    isSelected = isSelected,
+                                    modifier = Modifier.clickable(onClick = clickAction),
                                 )
                             } else {
                                 // Fallback to regular line item if parsing fails
@@ -334,12 +353,8 @@ fun LyricsView(
                                     translatedWords = translatedWords,
                                     isBold = index <= currentLineIndex,
                                     isCurrent = index == currentLineIndex,
-                                    modifier =
-                                        Modifier
-                                            .clickable {
-                                                val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
-                                                onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
-                                            },
+                                    isSelected = isSelected,
+                                    modifier = Modifier.clickable(onClick = clickAction),
                                 )
                             }
                         }
@@ -351,12 +366,11 @@ fun LyricsView(
                                 translatedWords = translatedWords,
                                 isBold = index <= currentLineIndex || lyricsData.lyrics.syncType != "LINE_SYNCED",
                                 isCurrent = index == currentLineIndex || lyricsData.lyrics.syncType != "LINE_SYNCED",
-                                modifier =
-                                    Modifier
-                                        .clickable(enabled = lyricsData.lyrics.syncType == "LINE_SYNCED") {
-                                            val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
-                                            onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
-                                        },
+                                isSelected = isSelected,
+                                modifier = Modifier.clickable(
+                                    enabled = isShareMode || lyricsData.lyrics.syncType == "LINE_SYNCED",
+                                    onClick = clickAction,
+                                ),
                             )
                         }
                     }
@@ -372,48 +386,62 @@ fun LyricsLineItem(
     translatedWords: String?,
     isBold: Boolean,
     isCurrent: Boolean = false,
+    isSelected: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Crossfade(targetState = isBold) {
-        if (it) {
+    val selectionModifier = if (isSelected) {
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.15f))
+            .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 4.dp)
+    } else {
+        Modifier
+    }
+
+    Box(modifier = selectionModifier) {
+        Crossfade(targetState = isBold) {
+            if (it) {
+                Column(
+                    modifier = modifier,
+                ) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = originalWords,
+                        style = typo().headlineLarge,
+                        color = if (isCurrent || isSelected) Color.White else DimOriginalColor,
+                    )
+                    if (translatedWords != null) {
+                        Text(
+                            text = translatedWords,
+                            style = typo().bodyMedium,
+                            color = if (isCurrent) Color.Yellow else DimTranslatedColor,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+        }
+        if (!isBold) {
             Column(
                 modifier = modifier,
             ) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = originalWords,
-                    style = typo().headlineLarge,
-                    color = if (isCurrent) Color.White else DimOriginalColor,
+                    style = typo().headlineMedium,
+                    color = if (isSelected) Color.White else DimOriginalColor,
                 )
                 if (translatedWords != null) {
                     Text(
                         text = translatedWords,
                         style = typo().bodyMedium,
-                        color = if (isCurrent) Color.Yellow else DimTranslatedColor,
+                        color = DimTranslatedColor,
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
-        }
-    }
-    if (!isBold) {
-        Column(
-            modifier = modifier,
-        ) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = originalWords,
-                style = typo().headlineMedium,
-                color = DimOriginalColor,
-            )
-            if (translatedWords != null) {
-                Text(
-                    text = translatedWords,
-                    style = typo().bodyMedium,
-                    color = DimTranslatedColor,
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
@@ -425,6 +453,7 @@ fun RichSyncLyricsLineItem(
     translatedWords: String?,
     currentTimeMs: Long,
     isCurrent: Boolean,
+    isSelected: Boolean = false,
     customFontSize: TextUnit? = null,
     customPadding: Dp = 12.dp,
     modifier: Modifier = Modifier,
@@ -436,10 +465,22 @@ fun RichSyncLyricsLineItem(
         }
     }
 
-    Column(
-        modifier = modifier,
-    ) {
-        Spacer(modifier = Modifier.height(customPadding))
+    val selectionModifier = if (isSelected) {
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.15f))
+            .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 4.dp)
+    } else {
+        Modifier
+    }
+
+    Box(modifier = selectionModifier) {
+        Column(
+            modifier = modifier,
+        ) {
+            Spacer(modifier = Modifier.height(customPadding))
 
         // Original lyrics with rich sync highlighting - using FlowRow for word wrapping
         FlowRow(
@@ -488,6 +529,7 @@ fun RichSyncLyricsLineItem(
 
         Spacer(modifier = Modifier.height(customPadding))
     }
+}
 }
 
 @Composable
@@ -703,6 +745,18 @@ fun FullscreenLyricsSheet(
         mutableStateOf(false)
     }
 
+    var showLyricsShareDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var isShareMode by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var selectedLineIndexes by remember {
+        mutableStateOf(setOf<Int>())
+    }
+
     ModalBottomSheet(
         onDismissRequest = {
             onDismiss()
@@ -892,7 +946,25 @@ fun FullscreenLyricsSheet(
                         sharedViewModel.onUIEvent(UIEvent.ToggleLike)
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Share Lyrics Button
+                    IconButton(
+                        onClick = {
+                            isShareMode = !isShareMode
+                            if (!isShareMode) {
+                                selectedLineIndexes = emptySet()
+                            }
+                        },
+                    ) {
+                        Icon(
+                            imageVector = SimpIcons.Share,
+                            contentDescription = stringResource(Res.string.share_lyrics),
+                            tint = if (isShareMode) Color(0xFFFFD54F) else Color.White,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     // Three Dot Menu
                     IconButton(
@@ -903,6 +975,47 @@ fun FullscreenLyricsSheet(
                             contentDescription = "",
                             tint = Color.White,
                         )
+                    }
+                }
+
+                // Share Lyrics Mode Banner
+                AnimatedVisibility(visible = isShareMode) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 36.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF2C2C2E).copy(alpha = 0.92f))
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = if (selectedLineIndexes.isEmpty()) {
+                                stringResource(Res.string.select_lyrics_to_share)
+                            } else {
+                                stringResource(Res.string.select_lines_hint, 4) + " (${selectedLineIndexes.size}/4)"
+                            },
+                            style = typo().bodySmall,
+                            color = Color.White,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (selectedLineIndexes.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = { showLyricsShareDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = startColor.value),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.share_quote_card),
+                                    style = typo().labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -925,6 +1038,19 @@ fun FullscreenLyricsSheet(
                                     timeLine = sharedViewModel.timeline,
                                     onLineClick = { f ->
                                         sharedViewModel.onUIEvent(UIEvent.UpdateProgress(f))
+                                    },
+                                    isShareMode = isShareMode,
+                                    selectedLineIndexes = selectedLineIndexes,
+                                    onToggleSelectLine = { idx ->
+                                        selectedLineIndexes = if (idx in selectedLineIndexes) {
+                                            selectedLineIndexes - idx
+                                        } else {
+                                            if (selectedLineIndexes.size < 4) {
+                                                selectedLineIndexes + idx
+                                            } else {
+                                                selectedLineIndexes
+                                            }
+                                        }
                                     },
                                     modifier = Modifier.fillMaxSize(),
                                     showScrollShadows = true,
@@ -1223,6 +1349,23 @@ fun FullscreenLyricsSheet(
             song = null,
             setSleepTimerEnable = true,
             changeMainLyricsProviderEnable = true,
+        )
+    }
+    if (showLyricsShareDialog && selectedLineIndexes.isNotEmpty()) {
+        val selectedWords = selectedLineIndexes.sorted().mapNotNull { idx ->
+            screenDataState.lyricsData?.lyrics?.lines?.getOrNull(idx)?.words
+        }
+        LyricsShareBottomSheet(
+            trackTitle = screenDataState.nowPlayingTitle,
+            artistName = screenDataState.artistName,
+            thumbnailUrl = screenDataState.thumbnailURL,
+            selectedLines = selectedWords,
+            accentColor = startColor.value,
+            onDismissRequest = {
+                showLyricsShareDialog = false
+                isShareMode = false
+                selectedLineIndexes = emptySet()
+            },
         )
     }
 }

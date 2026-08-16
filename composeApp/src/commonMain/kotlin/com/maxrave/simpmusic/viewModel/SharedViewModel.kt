@@ -64,6 +64,7 @@ import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.expect.getDownloadFolderPath
 import com.maxrave.simpmusic.expect.ui.toByteArray
+import com.maxrave.simpmusic.extension.sanitizeTrackTitle
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.utils.VersionManager
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
@@ -304,13 +305,16 @@ class SharedViewModel(
                     canvasJob?.cancel()
                     _nowPlayingState.value = state
                     state.songEntity?.let { track ->
+                        val artist =
+                            track
+                                .artistName
+                                ?.joinToString(", ") ?: ""
+                        val cleanEnabled = dataStoreManager.cleanTrackTitles.first() != FALSE
+                        val displayTitle = if (cleanEnabled) track.title.sanitizeTrackTitle(artist) else track.title
                         _nowPlayingScreenData.value =
                             NowPlayingScreenData(
-                                nowPlayingTitle = track.title,
-                                artistName =
-                                    track
-                                        .artistName
-                                        ?.joinToString(", ") ?: "",
+                                nowPlayingTitle = displayTitle,
+                                artistName = artist,
                                 isVideo = false,
                                 thumbnailURL = null,
                                 canvasData = null,

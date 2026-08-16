@@ -255,6 +255,7 @@ import simpmusic.composeapp.generated.resources.saved_to_local_playlist
 import simpmusic.composeapp.generated.resources.scale
 import simpmusic.composeapp.generated.resources.set
 import simpmusic.composeapp.generated.resources.share
+import simpmusic.composeapp.generated.resources.share_lyrics
 import simpmusic.composeapp.generated.resources.share_url
 import simpmusic.composeapp.generated.resources.simpmusic_lyrics
 import simpmusic.composeapp.generated.resources.sleep_minutes
@@ -1393,6 +1394,7 @@ fun NowPlayingBottomSheet(
     onDelete: (() -> Unit)? = null,
     onLibraryDelete: (() -> Unit)? = null,
     dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
+    sharedViewModel: SharedViewModel = koinInject(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
@@ -1416,6 +1418,7 @@ fun NowPlayingBottomSheet(
     var isBottomSheetVisible by rememberSaveable { mutableStateOf(false) }
     var changePlaybackSpeedPitch by remember { mutableStateOf(false) }
     var changeLyricsOffset by remember { mutableStateOf(false) }
+    var showLyricsShareSheet by remember { mutableStateOf(false) }
     val crossfadeEnabled by dataStoreManager.crossfadeEnabled.collectAsState(DataStoreManager.FALSE)
 
     LaunchedEffect(uiState) {
@@ -1861,6 +1864,12 @@ fun NowPlayingBottomSheet(
                                 ) {
                                     changeLyricsOffset = true
                                 }
+                                ActionButton(
+                                    icon = SimpIcons.Share,
+                                    text = Res.string.share_lyrics,
+                                ) {
+                                    showLyricsShareSheet = true
+                                }
                             }
                         }
                     }
@@ -1924,6 +1933,19 @@ fun NowPlayingBottomSheet(
                 }
             }
         }
+    }
+
+    if (showLyricsShareSheet) {
+        val lyricsLines = sharedViewModel.nowPlayingScreenData.value.lyricsData?.lyrics?.lines?.mapNotNull { it.words }?.take(4)?.ifEmpty { null }
+            ?: listOf("♫ ${uiState.songUIState.title}")
+        LyricsShareBottomSheet(
+            trackTitle = uiState.songUIState.title,
+            artistName = uiState.songUIState.listArtists.toListName().connectArtists(),
+            thumbnailUrl = uiState.songUIState.thumbnails,
+            selectedLines = lyricsLines,
+            accentColor = seed,
+            onDismissRequest = { showLyricsShareSheet = false },
+        )
     }
 }
 

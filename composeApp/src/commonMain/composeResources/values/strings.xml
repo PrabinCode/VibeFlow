@@ -598,4 +598,16 @@
     <string name="lyrics_offset_description">Fine-tune lyrics synchronization earlier or later</string>
     <string name="adjust_lyrics_timing">Adjust lyrics timing</string>
     <string name="reset_offset">Reset (0s)</string>
+    <string name="clean_track_titles">Clean track titles</string>
+    <string name="clean_track_titles_description">Remove video tags like (Official Video), [4K], (Lyrics), etc.</string>
+    <string name="share_lyrics">Share Lyrics</string>
+    <string name="select_lyrics_to_share">Select lyrics to share</string>
+    <string name="select_lines_hint">Tap up to %1$d lines to create a lyric quote card</string>
+    <string name="share_quote_card">Create Lyric Card</string>
+    <string name="card_style">Card Style</string>
+    <string name="card_gradient">Gradient</string>
+    <string name="card_dark">Dark Glass</string>
+    <string name="card_light">Light Minimal</string>
+    <string name="copy_lyrics">Copy Lyrics</string>
+    <string name="lyrics_copied">Lyrics copied to clipboard</string>
 </resources>

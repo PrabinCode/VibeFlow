@@ -203,6 +203,8 @@ import simpmusic.composeapp.generated.resources.clear_canvas_cache
 import simpmusic.composeapp.generated.resources.clear_downloaded_cache
 import simpmusic.composeapp.generated.resources.clear_player_cache
 import simpmusic.composeapp.generated.resources.clear_thumbnail_cache
+import simpmusic.composeapp.generated.resources.clean_track_titles
+import simpmusic.composeapp.generated.resources.clean_track_titles_description
 import simpmusic.composeapp.generated.resources.content
 import simpmusic.composeapp.generated.resources.content_country
 import simpmusic.composeapp.generated.resources.contributor_email
@@ -464,6 +466,7 @@ fun SettingScreen(
     val videoQuality by viewModel.videoQuality.collectAsStateWithLifecycle()
     val sendData by remember { viewModel.sendBackToGoogle.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val normalizeVolume by remember { viewModel.normalizeVolume.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
+    val cleanTrackTitles by remember { viewModel.cleanTrackTitles.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = true)
     val skipSilent by remember { viewModel.skipSilent.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val savePlaybackState by remember { viewModel.savedPlaybackState.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val saveLastPlayed by remember { viewModel.saveRecentSongAndQueue.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
@@ -1060,6 +1063,11 @@ fun SettingScreen(
                         title = stringResource(Res.string.normalize_volume),
                         subtitle = stringResource(Res.string.balance_media_loudness),
                         switch = (normalizeVolume to { viewModel.setNormalizeVolume(it) }),
+                    )
+                    SettingItem(
+                        title = stringResource(Res.string.clean_track_titles),
+                        subtitle = stringResource(Res.string.clean_track_titles_description),
+                        switch = (cleanTrackTitles to { viewModel.setCleanTrackTitles(it) }),
                     )
                     SettingItem(
                         title = stringResource(Res.string.skip_silent),

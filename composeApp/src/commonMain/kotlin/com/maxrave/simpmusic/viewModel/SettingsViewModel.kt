@@ -75,6 +75,8 @@ class SettingsViewModel(
     val loggedIn: StateFlow<String?> = _loggedIn
     private var _normalizeVolume: MutableStateFlow<String?> = MutableStateFlow(null)
     val normalizeVolume: StateFlow<String?> = _normalizeVolume
+    private var _cleanTrackTitles: MutableStateFlow<String?> = MutableStateFlow(null)
+    val cleanTrackTitles: StateFlow<String?> = _cleanTrackTitles
     private var _skipSilent: MutableStateFlow<String?> = MutableStateFlow(null)
     val skipSilent: StateFlow<String?> = _skipSilent
     private var _savedPlaybackState: MutableStateFlow<String?> = MutableStateFlow(null)
@@ -258,6 +260,7 @@ class SettingsViewModel(
         getPlayerCacheLimit()
         getLoggedIn()
         getNormalizeVolume()
+        getCleanTrackTitles()
         getSkipSilent()
         getSavedPlaybackState()
         getSendBackToGoogle()
@@ -1249,6 +1252,21 @@ class SettingsViewModel(
         viewModelScope.launch {
             dataStoreManager.setNormalizeVolume(normalizeVolume)
             getNormalizeVolume()
+        }
+    }
+
+    fun getCleanTrackTitles() {
+        viewModelScope.launch {
+            dataStoreManager.cleanTrackTitles.collect { clean ->
+                _cleanTrackTitles.emit(clean)
+            }
+        }
+    }
+
+    fun setCleanTrackTitles(clean: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setCleanTrackTitles(clean)
+            getCleanTrackTitles()
         }
     }
 
