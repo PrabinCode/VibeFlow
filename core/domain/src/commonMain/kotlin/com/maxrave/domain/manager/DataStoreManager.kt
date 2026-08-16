@@ -78,6 +78,10 @@ interface DataStoreManager {
 
     suspend fun setCleanTrackTitles(clean: Boolean)
 
+    val playerStyle: Flow<String>
+
+    suspend fun setPlayerStyle(style: String)
+
     val skipSilent: Flow<String>
 
     suspend fun setSkipSilent(skip: Boolean)
@@ -455,5 +459,9 @@ interface DataStoreManager {
         const val AUTO_BACKUP_FREQUENCY_DAILY = "daily"
         const val AUTO_BACKUP_FREQUENCY_WEEKLY = "weekly"
         const val AUTO_BACKUP_FREQUENCY_MONTHLY = "monthly"
+
+        // Player Styles
+        const val PLAYER_STYLE_APPLE = "apple_music"
+        const val PLAYER_STYLE_CLASSIC = "classic"
     }
 }

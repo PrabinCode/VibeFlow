@@ -205,6 +205,10 @@ import simpmusic.composeapp.generated.resources.clear_player_cache
 import simpmusic.composeapp.generated.resources.clear_thumbnail_cache
 import simpmusic.composeapp.generated.resources.clean_track_titles
 import simpmusic.composeapp.generated.resources.clean_track_titles_description
+import simpmusic.composeapp.generated.resources.player_style
+import simpmusic.composeapp.generated.resources.player_style_apple
+import simpmusic.composeapp.generated.resources.player_style_classic
+import simpmusic.composeapp.generated.resources.player_style_description
 import simpmusic.composeapp.generated.resources.content
 import simpmusic.composeapp.generated.resources.content_country
 import simpmusic.composeapp.generated.resources.contributor_email
@@ -467,6 +471,7 @@ fun SettingScreen(
     val sendData by remember { viewModel.sendBackToGoogle.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val normalizeVolume by remember { viewModel.normalizeVolume.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val cleanTrackTitles by remember { viewModel.cleanTrackTitles.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = true)
+    val playerStyle by viewModel.playerStyle.collectAsStateWithLifecycle(initialValue = DataStoreManager.PLAYER_STYLE_APPLE)
     val skipSilent by remember { viewModel.skipSilent.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val savePlaybackState by remember { viewModel.savedPlaybackState.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val saveLastPlayed by remember { viewModel.saveRecentSongAndQueue.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
@@ -669,6 +674,35 @@ fun SettingScreen(
                         isEnable = getPlatform() == Platform.Android,
                     )
                 }
+                val playerStyleLabels =
+                    listOf(
+                        DataStoreManager.PLAYER_STYLE_APPLE to stringResource(Res.string.player_style_apple),
+                        DataStoreManager.PLAYER_STYLE_CLASSIC to stringResource(Res.string.player_style_classic),
+                    )
+                SettingItem(
+                    title = stringResource(Res.string.player_style),
+                    subtitle = playerStyleLabels.firstOrNull { it.first == playerStyle }?.second ?: stringResource(Res.string.player_style_apple),
+                    smallSubtitle = true,
+                    onClick = {
+                        viewModel.setAlertData(
+                            SettingAlertState(
+                                title = runBlocking { getString(Res.string.player_style) },
+                                selectOne =
+                                    SettingAlertState.SelectData(
+                                        listSelect = playerStyleLabels.map { (it.first == playerStyle) to it.second },
+                                    ),
+                                confirm =
+                                    runBlocking { getString(Res.string.change) } to { state ->
+                                        val selected = state.selectOne?.getSelected()
+                                        playerStyleLabels.firstOrNull { it.second == selected }?.first?.let {
+                                            viewModel.setPlayerStyle(it)
+                                        }
+                                    },
+                                dismiss = runBlocking { getString(Res.string.cancel) },
+                            ),
+                        )
+                    },
+                )
             }
         }
         item(key = "content") {

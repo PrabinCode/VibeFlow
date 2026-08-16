@@ -248,6 +248,19 @@ internal class DataStoreManagerImpl(
         }
     }
 
+    override val playerStyle: Flow<String> =
+        settingsDataStore.data.map { preferences ->
+            preferences[PLAYER_STYLE] ?: DataStoreManager.PLAYER_STYLE_APPLE
+        }
+
+    override suspend fun setPlayerStyle(style: String) {
+        withContext(Dispatchers.IO) {
+            settingsDataStore.edit { settings ->
+                settings[PLAYER_STYLE] = style
+            }
+        }
+    }
+
     override val skipSilent: Flow<String> =
         settingsDataStore.data.map { preferences ->
             preferences[SKIP_SILENT] ?: FALSE
@@ -1518,6 +1531,7 @@ internal class DataStoreManagerImpl(
         val VIDEO_DOWNLOAD_QUALITY = stringPreferencesKey("video_download_quality")
         val NORMALIZE_VOLUME = stringPreferencesKey("normalize_volume")
         val CLEAN_TRACK_TITLES = stringPreferencesKey("clean_track_titles")
+        val PLAYER_STYLE = stringPreferencesKey("player_style")
         val SKIP_SILENT = stringPreferencesKey("skip_silent")
         val SAVE_STATE_OF_PLAYBACK = stringPreferencesKey("save_state_of_playback")
         val SAVE_RECENT_SONG = stringPreferencesKey("save_recent_song")

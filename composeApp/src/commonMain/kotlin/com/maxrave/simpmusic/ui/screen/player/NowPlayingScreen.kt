@@ -301,6 +301,7 @@ fun NowPlayingScreenContent(
     val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
     val likeStatus by sharedViewModel.likeStatus.collectAsStateWithLifecycle()
     val castState by sharedViewModel.castState.collectAsStateWithLifecycle()
+    val playerStyle by dataStoreManager.playerStyle.collectAsStateWithLifecycle(DataStoreManager.PLAYER_STYLE_APPLE)
 
     val shouldShowVideo by sharedViewModel.getVideo.collectAsStateWithLifecycle()
     val translatedVoteState by sharedViewModel.translatedVoteState.collectAsStateWithLifecycle()
@@ -769,16 +770,41 @@ fun NowPlayingScreenContent(
         )
     }
 
-    if (screenDataState.lyricsData != null && controllerState.isPlaying) {
-        KeepScreenOn()
-    }
-    Box {
-        Column(
-            Modifier
-                .verticalScroll(
-                    mainScrollState,
-                    enabled = isExpanded,
-                )
+    if (playerStyle == DataStoreManager.PLAYER_STYLE_APPLE) {
+        AppleMusicPlayerView(
+            screenDataState = screenDataState,
+            controllerState = controllerState,
+            timelineState = timelineState,
+            castState = castState,
+            likeStatus = likeStatus,
+            startColor = startColor.value,
+            endColor = endColor.value,
+            dismissIcon = dismissIcon,
+            onDismiss = onDismiss,
+            onMoreOptionsClick = { showSheet = true },
+            onArtistClick = {
+                val song = sharedViewModel.nowPlayingState.value?.songEntity
+                (
+                    song?.artistId?.firstOrNull()?.takeIf { it.isNotEmpty() }
+                        ?: screenDataState.songInfoData?.authorId
+                )?.let { channelId ->
+                    onDismiss()
+                    navController.navigate(ArtistDestination(channelId = channelId))
+                }
+            },
+            onLyricsClick = { showFullscreenLyrics = true },
+            onQueueClick = { showQueueBottomSheet = true },
+            onUIEvent = { sharedViewModel.onUIEvent(it) },
+            onSetBitmap = { sharedViewModel.setBitmap(it) },
+        )
+    } else {
+        Box {
+            Column(
+                Modifier
+                    .verticalScroll(
+                        mainScrollState,
+                        enabled = isExpanded,
+                    )
                 // Horizontal swipe is handled by the unified ArtworkPager below.
                 // Spacers in this Column have no pointer input and don't block hits, so
                 // drags fall through to the Pager.
@@ -2635,4 +2661,5 @@ fun NowPlayingScreenContent(
             }
         }
     }
+}
 }

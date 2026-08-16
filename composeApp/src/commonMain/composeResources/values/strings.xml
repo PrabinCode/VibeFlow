@@ -610,4 +610,8 @@
     <string name="card_light">Light Minimal</string>
     <string name="copy_lyrics">Copy Lyrics</string>
     <string name="lyrics_copied">Lyrics copied to clipboard</string>
+    <string name="player_style">Player style</string>
+    <string name="player_style_description">Choose the layout and aesthetic of the Now Playing screen</string>
+    <string name="player_style_apple">Apple Music Style</string>
+    <string name="player_style_classic">Classic Style</string>
 </resources>
