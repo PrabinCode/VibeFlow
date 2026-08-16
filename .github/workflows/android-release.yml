@@ -181,7 +181,19 @@ jobs:
           chmod +x gradlew
           ./gradlew :composeApp:mpvSetupAll --no-configuration-cache
 
-      - name: Build Linux AppImage
+      - name: Write Conveyor Config
+        run: ./gradlew :desktopApp:writeConveyorConfig --no-configuration-cache
+
+      - name: Run Conveyor (linux-app)
+        uses: hydraulic-software/conveyor/actions/build@v22.0
+        continue-on-error: true
+        with:
+          command: -Kapp.machines=linux.amd64.glibc make linux-app
+          agree_to_license: 1
+          signing_key: ${{ secrets.CONVEYOR_SIGNING_KEY }}
+
+      - name: Wrap Linux app tree → AppImage
+        continue-on-error: true
         run: ./gradlew :desktopApp:packageConveyorAppImage --no-configuration-cache
 
       - name: Run Conveyor (make site, Mac + Windows only)
