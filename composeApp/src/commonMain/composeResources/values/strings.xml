@@ -594,4 +594,8 @@
     <string name="import_result_skipped">%1$d entries were skipped because their song was missing from the file.</string>
     <string name="import_failed">Import failed</string>
     <string name="import_invalid_file">This file is not a valid SimpMusic import file. Convert your library at simpmusic.org first.</string>
+    <string name="lyrics_offset">Lyrics Timing Offset</string>
+    <string name="lyrics_offset_description">Fine-tune lyrics synchronization earlier or later</string>
+    <string name="adjust_lyrics_timing">Adjust lyrics timing</string>
+    <string name="reset_offset">Reset (0s)</string>
 </resources>

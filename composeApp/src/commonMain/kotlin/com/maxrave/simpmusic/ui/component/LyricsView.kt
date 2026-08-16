@@ -89,6 +89,7 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.maxrave.domain.data.model.streams.TimeLine
+import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.simpmusic.extension.KeepScreenOn
 import com.maxrave.simpmusic.extension.ParsedRichSyncLine
 import com.maxrave.simpmusic.extension.animateScrollAndCentralizeItem
@@ -109,6 +110,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.crossfading
 import simpmusic.composeapp.generated.resources.unavailable
@@ -242,9 +244,11 @@ fun LyricsView(
     modifier: Modifier = Modifier,
     showScrollShadows: Boolean = false,
     backgroundColor: Color = Color(0xFF242424),
+    dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
 ) {
     val listState = rememberLazyListState()
     val current by timeLine.collectAsStateWithLifecycle()
+    val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
 
     val timedLineIndexes =
         remember(lyricsData.lyrics.lines) {
@@ -255,9 +259,9 @@ fun LyricsView(
                 }.sortedBy { it.startTimeMs }
         }
 
-    val currentLineIndex by remember(timedLineIndexes) {
+    val currentLineIndex by remember(timedLineIndexes, lyricsOffset) {
         derivedStateOf {
-            val now = current.current
+            val now = current.current + lyricsOffset
             if (now <= 0L) -1 else timedLineIndexes.activeIndexAt(now)
         }
     }
@@ -314,12 +318,13 @@ fun LyricsView(
                                 RichSyncLyricsLineItem(
                                     parsedLine = parsedLine,
                                     translatedWords = translatedWords,
-                                    currentTimeMs = current.current,
+                                    currentTimeMs = (current.current + lyricsOffset).coerceAtLeast(0L),
                                     isCurrent = index == currentLineIndex,
                                     modifier =
                                         Modifier
                                             .clickable {
-                                                onLineClick(line.startTimeMs.toFloat() * 100 / timeLine.value.total)
+                                                val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
+                                                onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
                                             },
                                 )
                             } else {
@@ -332,7 +337,8 @@ fun LyricsView(
                                     modifier =
                                         Modifier
                                             .clickable {
-                                                onLineClick(line.startTimeMs.toFloat() * 100 / timeLine.value.total)
+                                                val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
+                                                onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
                                             },
                                 )
                             }
@@ -348,7 +354,8 @@ fun LyricsView(
                                 modifier =
                                     Modifier
                                         .clickable(enabled = lyricsData.lyrics.syncType == "LINE_SYNCED") {
-                                            onLineClick(line.startTimeMs.toFloat() * 100 / timeLine.value.total)
+                                            val seekMs = (line.startTimeMs.toLongOrNull() ?: 0L) - lyricsOffset
+                                            onLineClick(seekMs.coerceAtLeast(0L).toFloat() * 100 / timeLine.value.total)
                                         },
                             )
                         }

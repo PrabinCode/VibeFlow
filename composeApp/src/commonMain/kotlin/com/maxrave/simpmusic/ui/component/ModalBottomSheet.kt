@@ -191,6 +191,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.add_to_a_playlist
 import simpmusic.composeapp.generated.resources.add_to_queue
+import simpmusic.composeapp.generated.resources.adjust_lyrics_timing
 import simpmusic.composeapp.generated.resources.album
 import simpmusic.composeapp.generated.resources.artists
 import simpmusic.composeapp.generated.resources.baseline_downloaded
@@ -224,6 +225,8 @@ import simpmusic.composeapp.generated.resources.like_and_dislike
 import simpmusic.composeapp.generated.resources.liked
 import simpmusic.composeapp.generated.resources.list_all_cookies_of_this_page
 import simpmusic.composeapp.generated.resources.lrclib
+import simpmusic.composeapp.generated.resources.lyrics_offset
+import simpmusic.composeapp.generated.resources.lyrics_offset_description
 import simpmusic.composeapp.generated.resources.main_lyrics_provider
 import simpmusic.composeapp.generated.resources.merging_audio_and_video
 import simpmusic.composeapp.generated.resources.mime_type
@@ -238,6 +241,7 @@ import simpmusic.composeapp.generated.resources.ok
 import simpmusic.composeapp.generated.resources.pitch
 import simpmusic.composeapp.generated.resources.play_next
 import simpmusic.composeapp.generated.resources.playback_speed
+import simpmusic.composeapp.generated.resources.reset_offset
 import simpmusic.composeapp.generated.resources.playback_speed_pitch
 import simpmusic.composeapp.generated.resources.playback_speed_pitch_disabled
 import simpmusic.composeapp.generated.resources.playlist_name_cannot_be_empty
@@ -1411,6 +1415,7 @@ fun NowPlayingBottomSheet(
     var sleepTimerWarning by remember { mutableStateOf(false) }
     var isBottomSheetVisible by rememberSaveable { mutableStateOf(false) }
     var changePlaybackSpeedPitch by remember { mutableStateOf(false) }
+    var changeLyricsOffset by remember { mutableStateOf(false) }
     val crossfadeEnabled by dataStoreManager.crossfadeEnabled.collectAsState(DataStoreManager.FALSE)
 
     LaunchedEffect(uiState) {
@@ -1421,6 +1426,19 @@ fun NowPlayingBottomSheet(
 
     LaunchedEffect(key1 = song) {
         viewModel.setSongEntity(song)
+    }
+
+    if (changeLyricsOffset) {
+        val lyricsOffset by dataStoreManager.lyricsOffset.collectAsState(0L)
+        LyricsOffsetBottomSheet(
+            onDismiss = { changeLyricsOffset = false },
+            lyricsOffsetMs = lyricsOffset,
+            onSetOffset = { offset ->
+                coroutineScope.launch {
+                    dataStoreManager.setLyricsOffset(offset)
+                }
+            },
+        )
     }
 
     if (changePlaybackSpeedPitch) {
@@ -1830,11 +1848,19 @@ fun NowPlayingBottomSheet(
                     }
                     Crossfade(targetState = changeMainLyricsProviderEnable) {
                         if (it) {
-                            ActionButton(
-                                icon = SimpIcons.Lyrics,
-                                text = Res.string.main_lyrics_provider,
-                            ) {
-                                mainLyricsProvider = true
+                            Column {
+                                ActionButton(
+                                    icon = SimpIcons.Lyrics,
+                                    text = Res.string.main_lyrics_provider,
+                                ) {
+                                    mainLyricsProvider = true
+                                }
+                                ActionButton(
+                                    icon = SimpIcons.Tune,
+                                    text = Res.string.adjust_lyrics_timing,
+                                ) {
+                                    changeLyricsOffset = true
+                                }
                             }
                         }
                     }
@@ -2173,6 +2199,121 @@ fun PlaybackSpeedPitchBottomSheet(
                                 tint = rememberSurfaceDarkColors().subtitle,
                             )
                         }
+                    }
+                }
+                EndOfModalBottomSheet()
+            }
+        }
+    }
+}
+
+@ExperimentalMaterial3Api
+@Composable
+fun LyricsOffsetBottomSheet(
+    onDismiss: () -> Unit,
+    lyricsOffsetMs: Long,
+    onSetOffset: (Long) -> Unit,
+) {
+    val modelBottomSheetState =
+        rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = modelBottomSheetState,
+        containerColor = Color.Transparent,
+        contentColor = Color.Transparent,
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .5f),
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+    ) {
+        Card(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
+            colors = CardDefaults.cardColors().copy(containerColor = rememberSurfaceDarkColors().container),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Card(
+                    modifier =
+                        Modifier
+                            .width(40.dp)
+                            .height(4.dp),
+                    colors =
+                        CardDefaults.cardColors().copy(
+                            containerColor = rememberSurfaceDarkColors().handle,
+                        ),
+                    shape = RoundedCornerShape(50),
+                ) {}
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = SimpIcons.Tune,
+                        contentDescription = stringResource(Res.string.lyrics_offset),
+                        modifier = Modifier.size(24.dp),
+                        tint = rememberSurfaceDarkColors().subtitle,
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(Res.string.lyrics_offset),
+                            style = typo().titleMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = stringResource(Res.string.lyrics_offset_description),
+                            style = typo().bodySmall,
+                            color = rememberSurfaceDarkColors().subtitle,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                val offsetSign = if (lyricsOffsetMs > 0) "+" else ""
+                val offsetSec = lyricsOffsetMs.toFloat() / 1000f
+                val roundedSec = kotlin.math.round(offsetSec * 10f) / 10f
+                val offsetDisplay = "${offsetSign}${lyricsOffsetMs} ms (${offsetSign}${roundedSec}s)"
+                Text(
+                    text = if (lyricsOffsetMs == 0L) "0 ms (0.0s)" else offsetDisplay,
+                    style = typo().headlineLarge,
+                    color = if (lyricsOffsetMs != 0L) seed else rememberSurfaceDarkColors().content,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = { onSetOffset((lyricsOffsetMs - 500L).coerceIn(-10000L, 10000L)) },
+                    ) {
+                        Text("-0.5s", style = typo().labelSmall)
+                    }
+                    OutlinedButton(
+                        onClick = { onSetOffset((lyricsOffsetMs - 100L).coerceIn(-10000L, 10000L)) },
+                    ) {
+                        Text("-0.1s", style = typo().labelSmall)
+                    }
+                    Button(
+                        onClick = { onSetOffset(0L) },
+                    ) {
+                        Text(stringResource(Res.string.reset_offset), style = typo().labelSmall)
+                    }
+                    OutlinedButton(
+                        onClick = { onSetOffset((lyricsOffsetMs + 100L).coerceIn(-10000L, 10000L)) },
+                    ) {
+                        Text("+0.1s", style = typo().labelSmall)
+                    }
+                    OutlinedButton(
+                        onClick = { onSetOffset((lyricsOffsetMs + 500L).coerceIn(-10000L, 10000L)) },
+                    ) {
+                        Text("+0.5s", style = typo().labelSmall)
                     }
                 }
                 EndOfModalBottomSheet()

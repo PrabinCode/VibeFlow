@@ -92,6 +92,8 @@ class SettingsViewModel(
     val sendBackToGoogle: StateFlow<String?> = _sendBackToGoogle
     private var _mainLyricsProvider: MutableStateFlow<String?> = MutableStateFlow(null)
     val mainLyricsProvider: StateFlow<String?> = _mainLyricsProvider
+    private var _lyricsOffset: MutableStateFlow<Long> = MutableStateFlow(0L)
+    val lyricsOffset: StateFlow<Long> = _lyricsOffset
 
     private var _translationLanguage: MutableStateFlow<String?> = MutableStateFlow(null)
     val translationLanguage: StateFlow<String?> = _translationLanguage
@@ -266,6 +268,7 @@ class SettingsViewModel(
         getTranslationLanguage()
         getYoutubeSubtitleLanguage()
         getLyricsProvider()
+        getLyricsOffset()
         getUseTranslation()
         getPlayVideoInsteadOfAudio()
         getVideoQuality()
@@ -993,6 +996,21 @@ class SettingsViewModel(
         viewModelScope.launch {
             dataStoreManager.setLyricsProvider(provider)
             getLyricsProvider()
+        }
+    }
+
+    fun getLyricsOffset() {
+        viewModelScope.launch {
+            dataStoreManager.lyricsOffset.collect { offset ->
+                _lyricsOffset.emit(offset)
+            }
+        }
+    }
+
+    fun setLyricsOffset(offsetMs: Long) {
+        viewModelScope.launch {
+            dataStoreManager.setLyricsOffset(offsetMs)
+            getLyricsOffset()
         }
     }
 

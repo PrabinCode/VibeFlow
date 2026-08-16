@@ -116,6 +116,7 @@ import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.ActionButton
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfPage
+import com.maxrave.simpmusic.ui.component.LyricsOffsetBottomSheet
 import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.SettingItem
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
@@ -282,6 +283,8 @@ import simpmusic.composeapp.generated.resources.log_out_warning
 import simpmusic.composeapp.generated.resources.logged_in
 import simpmusic.composeapp.generated.resources.lrclib
 import simpmusic.composeapp.generated.resources.lyrics
+import simpmusic.composeapp.generated.resources.lyrics_offset
+import simpmusic.composeapp.generated.resources.lyrics_offset_description
 import simpmusic.composeapp.generated.resources.main_lyrics_provider
 import simpmusic.composeapp.generated.resources.manage_your_youtube_accounts
 import simpmusic.composeapp.generated.resources.maxrave_dev
@@ -466,6 +469,7 @@ fun SettingScreen(
     val saveLastPlayed by remember { viewModel.saveRecentSongAndQueue.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val killServiceOnExit by remember { viewModel.killServiceOnExit.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = true)
     val mainLyricsProvider by viewModel.mainLyricsProvider.collectAsStateWithLifecycle()
+    val lyricsOffset by viewModel.lyricsOffset.collectAsStateWithLifecycle()
     val youtubeSubtitleLanguage by viewModel.youtubeSubtitleLanguage.collectAsStateWithLifecycle()
     val spotifyLoggedIn by viewModel.spotifyLogIn.collectAsStateWithLifecycle()
     val spotifyLyrics by viewModel.spotifyLyrics.collectAsStateWithLifecycle()
@@ -506,6 +510,8 @@ fun SettingScreen(
     val themeMode by sharedViewModel.getThemeMode().collectAsStateWithLifecycle(DataStoreManager.THEME_MODE_DARK)
     val themeColorSource by sharedViewModel.getThemeColorSource().collectAsStateWithLifecycle(DataStoreManager.THEME_COLOR_DEFAULT)
     val customThemeColorHex by sharedViewModel.getCustomThemeColor().collectAsStateWithLifecycle(DataStoreManager.DEFAULT_THEME_COLOR_HEX)
+    var isShowAlert by remember { mutableStateOf(false) }
+    var showLyricsOffsetSheet by remember { mutableStateOf(false) }
     var showColorPickerDialog by rememberSaveable { mutableStateOf(false) }
     val discordLoggedIn by viewModel.discordLoggedIn.collectAsStateWithLifecycle()
     val lastfmLoggedIn by viewModel.lastfmLoggedIn.collectAsStateWithLifecycle()
@@ -1257,6 +1263,14 @@ fun SettingScreen(
                                 dismiss = runBlocking { getString(Res.string.cancel) },
                             ),
                         )
+                    },
+                )
+
+                SettingItem(
+                    title = stringResource(Res.string.lyrics_offset),
+                    subtitle = if (lyricsOffset == 0L) "0 ms (0.0s)" else "${if (lyricsOffset > 0) "+" else ""}${lyricsOffset} ms",
+                    onClick = {
+                        showLyricsOffsetSheet = true
                     },
                 )
 
@@ -2325,14 +2339,14 @@ fun SettingScreen(
                     title = stringResource(Res.string.author),
                     subtitle = stringResource(Res.string.maxrave_dev),
                     onClick = {
-                        uriHandler.openUri("https://github.com/maxrave-dev")
+                        uriHandler.openUri("https://github.com/PrabinCode")
                     },
                 )
                 SettingItem(
                     title = stringResource(Res.string.developer_blog),
                     subtitle = stringResource(Res.string.developer_blog_tagline),
                     onClick = {
-                        uriHandler.openUri("https://maxrave.dev")
+                        uriHandler.openUri("https://pcshrestha.com.np")
                     },
                 )
                 if (getPlatform() == Platform.Android) {
@@ -2346,7 +2360,7 @@ fun SettingScreen(
                     title = stringResource(Res.string.buy_me_a_coffee),
                     subtitle = stringResource(Res.string.donation),
                     onClick = {
-                        uriHandler.openUri("https://github.com/sponsors/maxrave-dev")
+                        uriHandler.openUri("https://github.com/sponsors/PrabinCode")
                     },
                 )
                 SettingItem(
@@ -2922,6 +2936,16 @@ fun SettingScreen(
                 },
             )
         }
+    }
+
+    if (showLyricsOffsetSheet) {
+        LyricsOffsetBottomSheet(
+            onDismiss = { showLyricsOffsetSheet = false },
+            lyricsOffsetMs = lyricsOffset,
+            onSetOffset = { offset ->
+                viewModel.setLyricsOffset(offset)
+            },
+        )
     }
 
     TopAppBar(

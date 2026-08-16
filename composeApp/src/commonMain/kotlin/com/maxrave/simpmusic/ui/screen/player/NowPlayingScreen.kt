@@ -122,6 +122,7 @@ import coil3.request.crossfade
 import coil3.toBitmap
 import com.kmpalette.rememberPaletteState
 import com.maxrave.common.Config.MAIN_PLAYER
+import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.RepeatState
 import com.maxrave.logger.Logger
@@ -282,6 +283,7 @@ fun NowPlayingScreen(
 fun NowPlayingScreenContent(
     sharedViewModel: SharedViewModel = koinInject(),
     mediaPlayerHandler: MediaPlayerHandler = koinInject(),
+    dataStoreManager: DataStoreManager = koinInject(),
     navController: NavController,
     isExpanded: Boolean,
     dismissIcon: ImageVector,
@@ -296,6 +298,7 @@ fun NowPlayingScreenContent(
     val controllerState by sharedViewModel.controllerState.collectAsStateWithLifecycle()
     val screenDataState by sharedViewModel.nowPlayingScreenData.collectAsStateWithLifecycle()
     val timelineState by sharedViewModel.timeline.collectAsStateWithLifecycle()
+    val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
     val likeStatus by sharedViewModel.likeStatus.collectAsStateWithLifecycle()
     val castState by sharedViewModel.castState.collectAsStateWithLifecycle()
 
@@ -643,7 +646,8 @@ fun NowPlayingScreenContent(
                 ?.translatedLyrics
                 ?.first
                 ?.lines
-        if (timelineState.current > 0L) {
+        val effectiveCurrent = timelineState.current + lyricsOffset
+        if (effectiveCurrent > 0L) {
             lines.indices.forEach { i ->
                 val startTimeMs = lines[i].startTimeMs.toLongOrNull() ?: 0L
                 val endTimeMs =
@@ -652,12 +656,12 @@ fun NowPlayingScreenContent(
                     } else {
                         startTimeMs + 60000
                     }
-                if (timelineState.current in startTimeMs..endTimeMs) {
+                if (effectiveCurrent in startTimeMs..endTimeMs) {
                     currentLyricLineIndex = i
                 }
             }
             if (lines.isNotEmpty() &&
-                timelineState.current in 0..(lines.getOrNull(0)?.startTimeMs?.toLongOrNull() ?: 0L)
+                effectiveCurrent in 0..(lines.getOrNull(0)?.startTimeMs?.toLongOrNull() ?: 0L)
             ) {
                 currentLyricLineIndex = -1
             }

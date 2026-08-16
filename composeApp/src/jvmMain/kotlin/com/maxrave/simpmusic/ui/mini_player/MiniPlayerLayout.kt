@@ -53,11 +53,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.maxrave.domain.data.model.streams.TimeLine
+import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.ControlState
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.extension.parseRichSyncWords
+import org.koin.compose.koinInject
 import com.maxrave.simpmusic.ui.component.PlayPauseButton
 import com.maxrave.simpmusic.ui.component.RichSyncLyricsLineItem
 import com.maxrave.simpmusic.ui.component.RippleIconButton
@@ -247,7 +250,10 @@ fun MediumMiniLayout(
     timeline: TimeLine,
     lyricsData: NowPlayingScreenData.LyricsData?,
     onUIEvent: (UIEvent) -> Unit,
+    dataStoreManager: DataStoreManager = koinInject(),
 ) {
+    val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
+    val effectiveCurrent = timeline.current + lyricsOffset
     val artworkInteractionSource = remember { MutableInteractionSource() }
     val isArtworkHovered by artworkInteractionSource.collectIsHoveredAsState()
     val artworkScale by animateFloatAsState(
@@ -387,9 +393,9 @@ fun MediumMiniLayout(
                 // Lyrics display (if available)
                 if (lyricsData != null && !lyricsData.lyrics.error && lyricsData.lyrics.lines != null) {
                     val currentLine =
-                        remember(timeline.current) {
+                        remember(effectiveCurrent) {
                             lyricsData.lyrics.lines?.findLast { line ->
-                                line.startTimeMs.toLongOrNull()?.let { it <= timeline.current } ?: false
+                                line.startTimeMs.toLongOrNull()?.let { it <= effectiveCurrent } ?: false
                             }
                         }
 
@@ -412,7 +418,7 @@ fun MediumMiniLayout(
                                     RichSyncLyricsLineItem(
                                         parsedLine = parsedLine,
                                         translatedWords = null,
-                                        currentTimeMs = timeline.current,
+                                        currentTimeMs = effectiveCurrent.coerceAtLeast(0L),
                                         isCurrent = true,
                                         customFontSize = typo().bodySmall.fontSize,
                                         modifier = Modifier,
@@ -468,7 +474,10 @@ fun SquareMiniLayout(
     timeline: TimeLine,
     lyricsData: NowPlayingScreenData.LyricsData?,
     onUIEvent: (UIEvent) -> Unit,
+    dataStoreManager: DataStoreManager = koinInject(),
 ) {
+    val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
+    val effectiveCurrent = timeline.current + lyricsOffset
     val artworkInteractionSource = remember { MutableInteractionSource() }
     val isArtworkHovered by artworkInteractionSource.collectIsHoveredAsState()
     val artworkScale by animateFloatAsState(
@@ -540,9 +549,9 @@ fun SquareMiniLayout(
             // Lyrics display (if available)
             if (lyricsData != null && !lyricsData.lyrics.error && lyricsData.lyrics.lines != null) {
                 val currentLine =
-                    remember(timeline.current) {
+                    remember(effectiveCurrent) {
                         lyricsData.lyrics.lines?.findLast { line ->
-                            line.startTimeMs.toLongOrNull()?.let { it <= timeline.current } ?: false
+                            line.startTimeMs.toLongOrNull()?.let { it <= effectiveCurrent } ?: false
                         }
                     }
 
@@ -558,7 +567,7 @@ fun SquareMiniLayout(
                             RichSyncLyricsLineItem(
                                 parsedLine = parsedLine,
                                 translatedWords = null,
-                                currentTimeMs = timeline.current,
+                                currentTimeMs = effectiveCurrent.coerceAtLeast(0L),
                                 isCurrent = true,
                                 customFontSize = typo().bodySmall.fontSize,
                                 modifier = Modifier.padding(horizontal = 8.dp),
@@ -727,7 +736,10 @@ fun ExpandedMiniLayout(
     timeline: TimeLine,
     lyricsData: NowPlayingScreenData.LyricsData?,
     onUIEvent: (UIEvent) -> Unit,
+    dataStoreManager: DataStoreManager = koinInject(),
 ) {
+    val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
+    val effectiveCurrent = timeline.current + lyricsOffset
     val artworkInteractionSource = remember { MutableInteractionSource() }
     val isArtworkHovered by artworkInteractionSource.collectIsHoveredAsState()
     val artworkScale by animateFloatAsState(
@@ -885,9 +897,9 @@ fun ExpandedMiniLayout(
             // Lyrics display below thumbnail row
             if (lyricsData != null && !lyricsData.lyrics.error && lyricsData.lyrics.lines != null) {
                 val currentLine =
-                    remember(timeline.current) {
+                    remember(effectiveCurrent) {
                         lyricsData.lyrics.lines?.findLast { line ->
-                            line.startTimeMs.toLongOrNull()?.let { it <= timeline.current } ?: false
+                            line.startTimeMs.toLongOrNull()?.let { it <= effectiveCurrent } ?: false
                         }
                     }
 
@@ -909,7 +921,7 @@ fun ExpandedMiniLayout(
                                 RichSyncLyricsLineItem(
                                     parsedLine = parsedLine,
                                     translatedWords = null,
-                                    currentTimeMs = timeline.current,
+                                    currentTimeMs = effectiveCurrent.coerceAtLeast(0L),
                                     isCurrent = true,
                                     customFontSize = typo().bodySmall.fontSize,
                                     customPadding = 4.dp,

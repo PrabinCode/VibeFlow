@@ -40,7 +40,7 @@ fun ReviewDialog(
         confirmButton = {
             TextButton(onClick = {
                 onDoneReview.invoke()
-                uriHandler.openUri("https://github.com/maxrave-dev/SimpMusic")
+                uriHandler.openUri("https://github.com/PrabinCode/VibeFlow")
             }) {
                 Text(
                     stringResource(Res.string.give_a_star),
@@ -87,12 +87,12 @@ fun ReviewDialog(
                     append(stringResource(Res.string.if_you_love_my_work_consider))
                     withLink(
                         LinkAnnotation.Url(
-                            "https://buymeacoffee.com/maxrave",
+                            "https://github.com/sponsors/PrabinCode",
                             TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.Underline, color = seed)),
                         ) {
                             onDoneReview.invoke()
                             onDismissRequest.invoke()
-                            uriHandler.openUri("https://buymeacoffee.com/maxrave")
+                            uriHandler.openUri("https://github.com/sponsors/PrabinCode")
                         },
                     ) {
                         append(stringResource(Res.string.buying_me_a_coffee))

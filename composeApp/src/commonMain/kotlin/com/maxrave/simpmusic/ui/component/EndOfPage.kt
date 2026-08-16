@@ -34,7 +34,7 @@ fun EndOfPage(withoutCredit: Boolean = false) {
                     stringResource(
                         Res.string.version_format,
                         VersionManager.getVersionName(),
-                    ) + "\nmaxrave-dev",
+                    ) + "\nPrabinCode",
                 style = typo().bodySmall,
                 textAlign = TextAlign.Center,
                 modifier =

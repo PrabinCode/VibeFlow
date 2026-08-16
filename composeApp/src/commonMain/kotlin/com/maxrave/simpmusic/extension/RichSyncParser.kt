@@ -44,8 +44,8 @@ fun parseRichSyncWords(
     println("[parseRichSyncWords] Input preview: ${words.take(100)}")
 
     // Strategy: Find all timestamps first, then extract text between them
-    // Regex to match timestamp only: <MM:SS.mm> or <MM:SS.mmm>
-    val timestampRegex = Regex("""<(\d{2}):(\d{2})\.(\d{2,3})>""")
+    // Regex to match timestamp only: <MM:SS.mm>, <M:SS.mmm>, etc.
+    val timestampRegex = Regex("""<(\d{1,3}):(\d{2})[.:,](\d{1,3})>""")
 
     val wordTimings = mutableListOf<WordTiming>()
 
@@ -55,14 +55,18 @@ fun parseRichSyncWords(
     timestamps.forEachIndexed { index, match ->
         val (minutes, seconds, fraction) = match.destructured
 
-        // Convert time to milliseconds
-        // If 2 digits (centiseconds): multiply by 10 to get ms (e.g., 62 -> 620ms)
-        // If 3 digits (milliseconds): use as-is (e.g., 620 -> 620ms)
         val fractionMs = fraction.toLongOrNull() ?: 0L
+        val millis =
+            when (fraction.length) {
+                1 -> fractionMs * 100L
+                2 -> fractionMs * 10L
+                3 -> fractionMs
+                else -> fraction.take(3).toLongOrNull() ?: 0L
+            }
         val timeMs =
             (minutes.toLongOrNull() ?: 0L) * 60000L +
                 (seconds.toLongOrNull() ?: 0L) * 1000L +
-                if (fraction.length == 2) fractionMs * 10L else fractionMs
+                millis
 
         // Extract text after this timestamp until the next timestamp (or end of string)
         val startPos = match.range.last + 1
