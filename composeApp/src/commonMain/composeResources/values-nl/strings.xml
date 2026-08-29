@@ -117,7 +117,7 @@
     <string name="about_us">Over ons</string>
     <string name="version">Versie</string>
     <string name="github">GitHub</string>
-    <string name="maxrave_dev">maxrave-dev</string>
+    <string name="maxrave_dev">Prabin Chandra Shrestha</string>
     <string name="buy_me_a_coffee">Koop een koffie</string>
     <string name="paypal">PayPal</string>
     <string name="title">Titel</string>
@@ -135,7 +135,7 @@
     <string name="albums_inArtist">Albums</string>
     <string name="singles_inArtist">Singles</string>
     <string name="fans_might_also_like_inArtist">Je bent misschien ook geïnteresseerd in</string>
-    <string name="crash_log">SimpMusic is gecrasht, excuses!\nStuur foutlog naar ontwikkelaar</string>
+    <string name="crash_log">VibeFlow is gecrasht, excuses!\nStuur foutlog naar ontwikkelaar</string>
     <string name="crash">Crash</string>
     <string name="send">Verstuur</string>
     <string name="mail_subject">Rapporteer crash</string>
@@ -209,7 +209,7 @@
     <string name="saved_to_local_playlist">Opgeslagen in lokale afspeellijst</string>
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">als je deze afspeellijst wilt de-synchroniseren, ga dan naar de lokale afspeellijst</string>
     <string name="log_in_to_get_YouTube_playlist">Log in om YouTube afspeellijsten op te halen</string>
-    <string name="sync_playlist_warning">SimpMusic maakt automatisch een YouTube-afspeellijst aan. Weet je het zeker?</string>
+    <string name="sync_playlist_warning">VibeFlow maakt automatisch een YouTube-afspeellijst aan. Weet je het zeker?</string>
     <string name="syncing">Synchroniseren</string>
     <string name="unsync_playlist_warning">"Deze afspeellijst de-synchroniseren? Deze afspeellijst zal niet verwijderd worden van YouTube Muziek "</string>
 </resources>

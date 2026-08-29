@@ -121,7 +121,7 @@
     <string name="about_us">हमारे बारे में</string>
     <string name="version">संस्करण</string>
     <string name="github">गिट्हब</string>
-    <string name="maxrave_dev">मैक्सरेव-देव</string>
+    <string name="maxrave_dev">Prabin Chandra Shrestha</string>
     <string name="buy_me_a_coffee">मुझे एक कॉफी खरीदें</string>
     <string name="developer_blog">डेवलपर ब्लॉग</string>
     <string name="paypal">पेयपाल</string>
@@ -273,7 +273,7 @@
     <string name="older_first">पुराने पहले</string>
     <string name="newer_first">नए पहले</string>
     <string name="added_date">जोड़ने की तिथि</string>
-    <string name="credit_app">बैकएंड के लिए YouTube Music का उपयोग करने वाला एक सरल संगीत ऐप \n\nSimpMusic YouTube और YouTube Music से बिना विज्ञापनों और ट्रैकिंग के संगीत स्ट्रीम करने के लिए एक ओपन सोर्स प्रोजेक्ट है। SimpMusic कई सुविधाएं प्रदान करता है:\n\n - संगीत स्ट्रीमिंग \n - सिंक किए गए गाने के बोल\n - व्यक्तिगत डेटा\n - और बहुत कुछ… \n\nSimpMusic हमेशा मुफ्त और बिना विज्ञापनों के है\n\nतुआन मिन्ह न्गुयेन डक (maxrave-dev) द्वारा ❤️ से बनाया गया</string>
+    <string name="credit_app">A modern music streaming app using YouTube Music for backend \n\nVibeFlow is an open source project to stream music from YouTube and YouTube Music without ads and tracking. VibeFlow provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nVibeFlow is always free and no ads\n\nMaintained with ❤️ by Prabin Chandra Shrestha (PrabinCode)\nOriginal project: SimpMusic by maxrave-dev</string>
     <string name="issue_tracker">समस्या ट्रैकर</string>
     <string name="featured_playlists">विशेष प्लेलिस्ट</string>
     <string name="featured_inArtist">पर प्रदर्शित</string>
@@ -312,7 +312,7 @@
     <string name="enable_spotify_lyrics">Spotify लिरिक्स सक्षम करें</string>
     <string name="spotify_lyrícs_info">बिना अनुवाद के अधिक गीत</string>
     <string name="enable_canvas">कैनवास सक्षम करें</string>
-    <string name="canvas_info">SimpMusic में Spotify कैनवास दिखाएं</string>
+    <string name="canvas_info">VibeFlow में Spotify कैनवास दिखाएं</string>
     <string name="spotify_lyrics_provider">गीत Spotify द्वारा प्रदान किए गए</string>
     <string name="offline_mode">ऑफ़लाइन मोड</string>
     <string name="added_to_youtube_liked">YouTube पसंदीदा में जोड़ा गया</string>
@@ -361,7 +361,7 @@
     <string name="loading">लोड हो रहा है</string>
     <string name="updating">अपडेट हो रहा है</string>
     <string name="go_to_log_in_page">लॉग इन पेज पर जाएं</string>
-    <string name="log_in_warning">अब YouTube Music को संगीत स्ट्रीम करने के लिए आपको लॉग इन करने की आवश्यकता है, Piped इंस्टेंस कभी-कभी काम नहीं कर सकता है। आपको SimpMusic के साथ बेहतर अनुभव प्राप्त करने के लिए YouTube में लॉग इन करना चाहिए।</string>
+    <string name="log_in_warning">अब YouTube Music को संगीत स्ट्रीम करने के लिए आपको लॉग इन करने की आवश्यकता है, Piped इंस्टेंस कभी-कभी काम नहीं कर सकता है। आपको VibeFlow के साथ बेहतर अनुभव प्राप्त करने के लिए YouTube में लॉग इन करना चाहिए।</string>
     <string name="spotify_canvas_cache">स्पॉटिफाए कैनवास कैश</string>
     <string name="clear_canvas_cache">कैनवास कैश साफ़ करें</string>
     <string name="proxy">प्रॉक्सी</string>
@@ -396,8 +396,8 @@
     <string name="other_version">अन्य वर्ज़न</string>
     <string name="later">बाद में</string>
     <string name="give_a_star">एक सितारा दें</string>
-    <string name="enjoying_simpmusic">सिम्पम्यूजिक का आनंद ले रहे हैं</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">यदि आपको सिम्पम्यूजिक का उपयोग करना अच्छा लगता है, तो गिटहब पर सिम्पम्यूजिक को स्टार करें या समीक्षा लिखें</string>
+    <string name="enjoying_vibeflow">सिम्पम्यूजिक का आनंद ले रहे हैं</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using VibeFlow, consider starring VibeFlow on GitHub</string>
     <string name="if_you_love_my_work_consider">"अगर आपको मेरा काम पसंद आए, तो "</string>
     <string name="buying_me_a_coffee">मुझे एक कॉफ़ी देकर समर्थन करें।</string>
     <string name="fade_audio_effect">ऑडियो प्रभाव फीका करें</string>
@@ -440,8 +440,8 @@
     <string name="use_anonymous">अनाम नाम से योगदान करें</string>
     <string name="contributor_name">योगदानकर्ता नाम</string>
     <string name="anonymous">अनाम</string>
-    <string name="simpmusic_lyrics">गीत SimpMusic Lyrics द्वारा प्रदान किए गए</string>
-    <string name="lyrics_provider_simpmusic">गीत के बोल सिम्पम्यूज़िक लिरिक्स द्वारा प्रदान किए गए</string>
+    <string name="vibeflow_lyrics">गीत VibeFlow Lyrics द्वारा प्रदान किए गए</string>
+    <string name="lyrics_provider_vibeflow">गीत के बोल सिम्पम्यूज़िक लिरिक्स द्वारा प्रदान किए गए</string>
     <string name="backup_in_progress">बैकप चल रहा है</string>
     <string name="restore_in_progress">पुनर्स्थापना प्रगति पर है</string>
     <string name="backup_downloaded">डाउनलोड किए गए डेटा का बैकअप लें</string>

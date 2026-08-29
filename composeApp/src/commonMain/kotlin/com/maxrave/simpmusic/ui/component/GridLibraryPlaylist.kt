@@ -241,19 +241,6 @@ internal inline fun <reified T> GridLibraryPlaylist(
                     }
 
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        val uriHandler = LocalUriHandler.current
-                        SimpMusicChartButton(
-                            modifier =
-                                Modifier.wrapContentWidth().padding(
-                                    vertical = 16.dp,
-                                ),
-                            onClick = {
-                                uriHandler.openUri("https://chart.simpmusic.org")
-                            },
-                        )
-                    }
-
-                    item(span = { GridItemSpan(maxLineSpan) }) {
                         EndOfPage()
                     }
                 }

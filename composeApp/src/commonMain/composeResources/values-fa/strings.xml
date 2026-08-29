@@ -121,7 +121,7 @@
     <string name="about_us">درباره ما</string>
     <string name="version">نگارش</string>
     <string name="github">گیت‌هاب</string>
-    <string name="maxrave_dev">maxrave-dev</string>
+    <string name="maxrave_dev">Prabin Chandra Shrestha</string>
     <string name="buy_me_a_coffee">برای من یک قهوه بخر</string>
     <string name="developer_blog">وبلاگ توسعه دهنده</string>
     <string name="paypal">پی‌پال</string>
@@ -141,7 +141,7 @@
     <string name="albums_inArtist">آلبوم‌ها</string>
     <string name="singles_inArtist">تک‌آهنگ‌ها</string>
     <string name="fans_might_also_like_inArtist">طرفداران ممکن است همچنین دوست داشته باشند</string>
-    <string name="crash_log">SimpMusic دچار مشکل شد. بابت این مشکل متاسفیم.\nگزارش خرابی را به
+    <string name="crash_log">VibeFlow دچار مشکل شد. بابت این مشکل متاسفیم.\nگزارش خرابی را به
     توسعه‌دهنده ارسال کنید</string>
     <string name="crash">خرابی</string>
     <string name="send">ارسال</string>
@@ -203,14 +203,14 @@
     <string name="save">نگه‌داری</string>
     <string name="saved">نگه‌داری شد</string>
     <string name="sponsor_block_intro">SponsorBlock یک سامانه جمع‌سپاری شده برای رد کردن بخش‌های
-    آزاردهنده ویدیوهای یوتیوب است.\nریزگان بیشتر: https://sponsor.ajay.app/\nدر SimpMusic،
+    آزاردهنده ویدیوهای یوتیوب است.\nریزگان بیشتر: https://sponsor.ajay.app/\nدر VibeFlow،
     SponsorBlock فقط زمانی موجود است که دستگاه آنلاین باشد</string>
     <string name="skip_sponsor_part_of_video">رد کردن بخش حامی ویدیو</string>
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">یک خطای غیرمنتظره
     رخ داده است. از بابت ناراحتی عذرخواهی می‌کنیم.</string>
     <string name="customactivityoncrash_error_activity_restart_app">برنامه را دوباره راه‌اندازی کنید</string>
-    <string name="help_build_lyrics_database">به SimpMusic کمک کنید تا پایگاه داده متن ترانه را بسازد</string>
-    <string name="help_build_lyrics_database_description">متن ترانه‌های ذخیره شده خود را به پایگاه داده متن SimpMusic ارسال کنید</string>
+    <string name="help_build_lyrics_database">به VibeFlow کمک کنید تا پایگاه داده متن ترانه را بسازد</string>
+    <string name="help_build_lyrics_database_description">متن ترانه‌های ذخیره شده خود را به پایگاه داده متن VibeFlow ارسال کنید</string>
     <string name="customactivityoncrash_error_activity_close_app">برنامه را ببندید</string>
     <string name="customactivityoncrash_error_activity_error_details">ریزگان خطا</string>
     <string name="customactivityoncrash_error_activity_error_details_title">ریزگان خطا</string>
@@ -246,7 +246,7 @@
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">اگر می‌خواهید این
     فهرست پخش را از همگام‌سازی خارج کنید، لطفاً به فهرست پخش محلی بروید</string>
     <string name="log_in_to_get_YouTube_playlist">برای دریافت فهرست پخش یوتیوب وارد شوید</string>
-    <string name="sync_playlist_warning">SimpMusic به‌طور خودکار یک فهرست پخش یوتیوب موزیک ایجاد خواهد
+    <string name="sync_playlist_warning">VibeFlow به‌طور خودکار یک فهرست پخش یوتیوب موزیک ایجاد خواهد
     کرد. آیا مطمئن هستید؟</string>
     <string name="syncing">در حال همگام‌سازی</string>
     <string name="unsync_playlist_warning">"آیا این فهرست پخش را از همگام‌سازی خارج کنید؟ این فهرست پخش
@@ -266,7 +266,7 @@
     <string name="password">گذرواژه</string>
     <string name="please_enter_your_email_and_password">لطفاً رایانامه و گذرواژه خود را وارد کنید</string>
     <string name="translation_language_message">کد زبان را وارد کنید (مثلاً: en) (2 حرف). اگر
-    می‌خواهید همان زبان SimpMusic باشد، لطفاً کادر ویرایش را خالی بگذارید.</string>
+    می‌خواهید همان زبان VibeFlow باشد، لطفاً کادر ویرایش را خالی بگذارید.</string>
     <string name="invalid_language_code">کد زبان نامعتبر است</string>
     <string name="lyrics_provider_youtube">متن ترانه ارائه شده توسط یوتیوب</string>
     <string name="limit_player_cache">محدود کردن نهان‌گاه(Cache) پخش‌کننده</string>
@@ -284,7 +284,7 @@
     <string name="older_first">ابتدا قدیمی تر</string>
     <string name="newer_first">ابتدا جدیدتر</string>
     <string name="added_date">تاریخ افزوده شدن</string>
-    <string name="credit_app">یک برنامه موسیقی ساده که از هسته یوتیوب موزیک بهره میبرد\n\nSimpMusic یک پروژه متن‌باز برای پخش موسیقی از یوتیوب و یوتیوب موزیک بدون آگهی و ردیابی است. SimpMusic ویژگی‌های زیادی ارائه می‌دهد:\n\n - پخش موسیقی \n - متن ترانه همگام‌سازی شده\n - داده‌های شخصی‌سازی شده\n - و غیره… \n\nSimpMusic همیشه رایگان و بدون آگهی است\n\nساخته شده با ❤️ از Tuan Minh Nguyen Duc (maxrave-dev)</string>
+    <string name="credit_app">A modern music streaming app using YouTube Music for backend \n\nVibeFlow is an open source project to stream music from YouTube and YouTube Music without ads and tracking. VibeFlow provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nVibeFlow is always free and no ads\n\nMaintained with ❤️ by Prabin Chandra Shrestha (PrabinCode)\nOriginal project: SimpMusic by maxrave-dev</string>
     <string name="issue_tracker">ردیاب مشکلات</string>
     <string name="featured_playlists">فهرست‌های پخش ویژه</string>
     <string name="featured_inArtist">ویژه در</string>
@@ -326,7 +326,7 @@
     <string name="enable_spotify_lyrics">به‌کارگیری متن ترانه اسپاتیفای</string>
     <string name="spotify_lyrícs_info">متن‌های بیشتری بدون ترجمه</string>
     <string name="enable_canvas">به‌کارگیری بوم</string>
-    <string name="canvas_info">نمایش بوم اسپاتیفای در SimpMusic</string>
+    <string name="canvas_info">نمایش بوم اسپاتیفای در VibeFlow</string>
     <string name="spotify_lyrics_provider">متن ترانه ارائه شده توسط اسپاتیفای</string>
     <string name="offline_mode">حالت آفلاین</string>
     <string name="added_to_youtube_liked">به فهرست پسندیده‌های یوتیوب افزوده شد</string>
@@ -375,7 +375,7 @@
     <string name="loading">درحال بارگذاری</string>
     <string name="updating">در حال بروز رسانی</string>
     <string name="go_to_log_in_page">به صفحه ورود به سیستم بروید</string>
-    <string name="log_in_warning">YouTube Music اکنون از شما می خواهد که برای پخش موسیقی وارد شوید، Piped Instance گاهی اوقات نیز نمی تواند کار کند. برای کسب تجربه بهتر با SimpMusic باید وارد YouTube شوید.</string>
+    <string name="log_in_warning">YouTube Music اکنون از شما می خواهد که برای پخش موسیقی وارد شوید، Piped Instance گاهی اوقات نیز نمی تواند کار کند. برای کسب تجربه بهتر با VibeFlow باید وارد YouTube شوید.</string>
     <string name="spotify_canvas_cache">کش Spotify Canvas</string>
     <string name="clear_canvas_cache">پاکسازی کش canvas</string>
     <string name="proxy">پروکسی</string>
@@ -410,8 +410,8 @@
     <string name="other_version">نسخه دیگر</string>
     <string name="later">بعدا</string>
     <string name="give_a_star">ستاره بدید</string>
-    <string name="enjoying_simpmusic">از SimpMusic لذت می‌بری</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">اگر از استفاده از SimpMusic لذت می‌برید، به SimpMusic در GitHub ستاره دهید یا نظر خود را درباره آن بنویسید</string>
+    <string name="enjoying_vibeflow">از VibeFlow لذت می‌بری</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using VibeFlow, consider starring VibeFlow on GitHub</string>
     <string name="if_you_love_my_work_consider">"اگر از کار من خوشتان می‌آید، لطفاً "</string>
     <string name="buying_me_a_coffee">یک قهوه برایم بخرید.</string>
     <string name="fade_audio_effect">افکت محو صدا</string>
@@ -456,7 +456,7 @@
     <string name="contributor_name">اسم مشارکت کننده</string>
     <string name="contributor_email">ایمیل مشارکت کننده</string>
     <string name="anonymous">ناشناس</string>
-    <string name="simpmusic_lyrics">متن ترانه‌های SimpMusic</string>
-    <string name="lyrics_provider_simpmusic">متن ترانه‌ها ارائه شده توسط سرویس متن ترانه‌های SimpMusic</string>
+    <string name="vibeflow_lyrics">متن ترانه‌های VibeFlow</string>
+    <string name="lyrics_provider_vibeflow">متن ترانه‌ها ارائه شده توسط سرویس متن ترانه‌های VibeFlow</string>
     <string name="backup_in_progress">پشتیبان گیری در حال انجام است</string>
 </resources>

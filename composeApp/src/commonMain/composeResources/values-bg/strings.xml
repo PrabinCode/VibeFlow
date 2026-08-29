@@ -121,7 +121,7 @@
     <string name="about_us">За нас</string>
     <string name="version">Версия</string>
     <string name="github">Github</string>
-    <string name="maxrave_dev">maxrave-dev</string>
+    <string name="maxrave_dev">Prabin Chandra Shrestha</string>
     <string name="buy_me_a_coffee">Buy me a coffee</string>
     <string name="paypal">PayPal</string>
     <string name="title">Заглавие</string>
@@ -140,7 +140,7 @@
     <string name="albums_inArtist">Албуми</string>
     <string name="singles_inArtist">Сингли</string>
     <string name="fans_might_also_like_inArtist">Почитателите може да харесат и</string>
-    <string name="crash_log">SimpMusic се срина. Извиняваме се за неудобството.\nИзпрати crash-log на разработчика</string>
+    <string name="crash_log">VibeFlow се срина. Извиняваме се за неудобството.\nИзпрати crash-log на разработчика</string>
     <string name="crash">Сриване</string>
     <string name="send">Изпрати</string>
     <string name="mail_subject">Докладване за срив</string>
@@ -199,12 +199,12 @@
     <string name="what_segments_will_be_skipped">Кой сегмент ще бъде прескочен</string>
     <string name="save">Запази</string>
     <string name="saved">Запазено</string>
-    <string name="sponsor_block_intro">SponsorBlock е система за прескачане на досадни части от YouTube видеа.\nЗа повече информация: https://sponsor.ajay.app/\nIn SimpMusic, SponsorBlock е наличен когато устройството е на линия</string>
+    <string name="sponsor_block_intro">SponsorBlock е система за прескачане на досадни части от YouTube видеа.\nЗа повече информация: https://sponsor.ajay.app/\nIn VibeFlow, SponsorBlock е наличен когато устройството е на линия</string>
     <string name="skip_sponsor_part_of_video">Прескачане на спонсорираната част</string>
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">Появи се непредвидена грешка. Извиняваме се за неудобството.</string>
     <string name="customactivityoncrash_error_activity_restart_app">Рестартирай приложението</string>
-    <string name="help_build_lyrics_database">Помогнете на SimpMusic лирики да построи датабазата за лирики</string>
-    <string name="help_build_lyrics_database_description">Пратете вашите запазени лирики към датабазата на SimpMusic лирики</string>
+    <string name="help_build_lyrics_database">Помогнете на VibeFlow лирики да построи датабазата за лирики</string>
+    <string name="help_build_lyrics_database_description">Пратете вашите запазени лирики към датабазата на VibeFlow лирики</string>
     <string name="customactivityoncrash_error_activity_close_app">Затвори приложението</string>
     <string name="customactivityoncrash_error_activity_error_details">Подробности за грешката</string>
     <string name="customactivityoncrash_error_activity_error_details_title">Подробности за грешката</string>
@@ -239,7 +239,7 @@
     <string name="saved_to_local_playlist">Запазено в локален плейлист</string>
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">ако искате да разсинхронизирате този плейлист, моля, отидете в локален плейлист</string>
     <string name="log_in_to_get_YouTube_playlist">Влезте за да получите YouTube Playlist</string>
-    <string name="sync_playlist_warning">SimpMusic ще създаде YouTube Music Playlist автоматично. Сигурни ли сте?</string>
+    <string name="sync_playlist_warning">VibeFlow ще създаде YouTube Music Playlist автоматично. Сигурни ли сте?</string>
     <string name="syncing">Синхронизиране</string>
     <string name="unsync_playlist_warning">"Разсинхронизиране на този плейлист? Този плейлист ще бъде премахнат от YouTube Music "</string>
     <string name="unsyncing">Разсинхронизиране</string>
@@ -256,7 +256,7 @@
     <string name="email">Имейл</string>
     <string name="password">Парола</string>
     <string name="please_enter_your_email_and_password">Моля, въведете вашият имейл и парола</string>
-    <string name="translation_language_message">Въведете код на език (Напр: bg) (2 букви). Оставете празно ако искате да използвате езика на SimpMusic.</string>
+    <string name="translation_language_message">Въведете код на език (Напр: bg) (2 букви). Оставете празно ако искате да използвате езика на VibeFlow.</string>
     <string name="invalid_language_code">Невалиден код на език</string>
     <string name="lyrics_provider_youtube">Текст предоставен от YouTube</string>
     <string name="lyrics_provider_betterlyrics">Лирики придоставени от BetterLyrics</string>
@@ -275,7 +275,7 @@
     <string name="older_first">Най-стари</string>
     <string name="newer_first">Най-нови</string>
     <string name="added_date">Дата на добавяне</string>
-    <string name="credit_app">Опростено приложение за музика, което използва YouTube Music за бекенд \n\nSimpMusic е проект с отворен код, който стриймва музика от YouTube и YouTube Music без реклами и проследяване. SimpMusic идва с много функции:\n\n - Стрийминг \n - Текстове\n - Персонализиране на данните\n - и т. н… \n\nSimpMusic е безплатен и без реклами\n\nBuild с ❤️ от Tuan Minh Nguyen Duc (maxrave-dev)</string>
+    <string name="credit_app">A modern music streaming app using YouTube Music for backend \n\nVibeFlow is an open source project to stream music from YouTube and YouTube Music without ads and tracking. VibeFlow provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nVibeFlow is always free and no ads\n\nMaintained with ❤️ by Prabin Chandra Shrestha (PrabinCode)\nOriginal project: SimpMusic by maxrave-dev</string>
     <string name="issue_tracker">Тракър на задачи</string>
     <string name="featured_playlists">Избрани плейлисти</string>
     <string name="featured_inArtist">Участва в</string>
@@ -315,7 +315,7 @@
     <string name="enable_spotify_lyrics">Включи Spotify Lyrics</string>
     <string name="spotify_lyrícs_info">Повече текстове без превод</string>
     <string name="enable_canvas">Включване на Canvas</string>
-    <string name="canvas_info">Покажи Spotify Canvas в SimpMusic</string>
+    <string name="canvas_info">Покажи Spotify Canvas в VibeFlow</string>
     <string name="spotify_lyrics_provider">Текст предоставен от Spotify</string>
     <string name="offline_mode">Режим офлайн</string>
     <string name="added_to_youtube_liked">Добавено в YouTube харесани</string>
@@ -364,7 +364,7 @@
     <string name="loading">Зареждане</string>
     <string name="updating">Актуализиране</string>
     <string name="go_to_log_in_page">Отиди на страницата за вход</string>
-    <string name="log_in_warning">YouTube Music вече изисква да сте вписани за да стриймвате музика, Piped понякога също не работи. Трябва да влезете в YouTube по-добро преживяване със SimpMusic.</string>
+    <string name="log_in_warning">YouTube Music вече изисква да сте вписани за да стриймвате музика, Piped понякога също не работи. Трябва да влезете в YouTube по-добро преживяване със VibeFlow.</string>
     <string name="spotify_canvas_cache">Spotify кеш на изображенията</string>
     <string name="clear_canvas_cache">Изстрий кеша на изображенията</string>
     <string name="proxy">Прокси</string>
@@ -399,8 +399,8 @@
     <string name="other_version">Друга версия</string>
     <string name="later">По-късно</string>
     <string name="give_a_star">Оцени</string>
-    <string name="enjoying_simpmusic">Доволни от SimpMusic</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">Оценете SimpMusic в GitHub или оставете ревю ако сте доволни</string>
+    <string name="enjoying_vibeflow">Доволни от VibeFlow</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using VibeFlow, consider starring VibeFlow on GitHub</string>
     <string name="if_you_love_my_work_consider">"Ако сте доволни от работата ми, моля помислете да "</string>
     <string name="buying_me_a_coffee">ме почерпите кафе.</string>
     <string name="fade_audio_effect">Постепенно намаляване на звука</string>

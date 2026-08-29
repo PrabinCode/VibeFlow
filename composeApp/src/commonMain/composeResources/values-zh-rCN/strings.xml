@@ -121,12 +121,12 @@
     <string name="about_us">关于我们</string>
     <string name="version">版本</string>
     <string name="github">Github</string>
-    <string name="maxrave_dev">maxrave-dev</string>
+    <string name="maxrave_dev">Prabin Chandra Shrestha</string>
     <string name="buy_me_a_coffee">请我喝杯咖啡（捐赠）</string>
     <string name="developer_blog">开发者博客</string>
-    <string name="developer_blog_tagline">阅读开发日志、教程及幕后花絮</string>
-    <string name="blog_promo_title">开发中的一些新内容</string>
-    <string name="blog_promo_message">我刚刚上线了个人博客 maxrave.dev，内容涵盖 SimpMusic 背后的故事、音乐科技深度解析以及工程技术笔记。感兴趣的话不妨去看看 ✨</string>
+    <string name="developer_blog_tagline">pcshrestha.com.np • Portfolio &amp; Engineering</string>
+    <string name="blog_promo_title">From the developer</string>
+    <string name="blog_promo_message">Explore engineering notes, architecture patterns, and portfolio at pcshrestha.com.np ✨</string>
     <string name="visit_blog">访问博客</string>
     <string name="paypal">PayPal</string>
     <string name="title">标题</string>
@@ -145,7 +145,7 @@
     <string name="albums_inArtist">专辑</string>
     <string name="singles_inArtist">单个</string>
     <string name="fans_might_also_like_inArtist">粉丝可能也喜欢</string>
-    <string name="crash_log">SimpMusic 崩溃了。很抱歉出现此问题。\n将崩溃日志发给开发人员</string>
+    <string name="crash_log">VibeFlow 崩溃了。很抱歉出现此问题。\n将崩溃日志发给开发人员</string>
     <string name="crash">崩溃</string>
     <string name="send">发送</string>
     <string name="mail_subject">报告崩溃</string>
@@ -204,12 +204,12 @@
     <string name="what_segments_will_be_skipped">将跳过哪些段</string>
     <string name="save">保存</string>
     <string name="saved">已保存</string>
-    <string name="sponsor_block_intro">SponsorBlock 是一个由众人组成的系统，用于跳过烦人的 YouTube 视频的部分。\n更多信息：https://sponsor.ajay.app/\n在 SimpMusic 中，SponsorBlock 仅在设备在线时可用</string>
+    <string name="sponsor_block_intro">SponsorBlock 是一个由众人组成的系统，用于跳过烦人的 YouTube 视频的部分。\n更多信息：https://sponsor.ajay.app/\n在 VibeFlow 中，SponsorBlock 仅在设备在线时可用</string>
     <string name="skip_sponsor_part_of_video">跳过视频赞助部分</string>
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">发生意外错误。很抱歉给您带来不便。</string>
     <string name="customactivityoncrash_error_activity_restart_app">重启应用</string>
-    <string name="help_build_lyrics_database">帮助SimpMusic 歌词建立歌词数据库</string>
-    <string name="help_build_lyrics_database_description">将您保存的歌词发送到 SimpMusic 歌词数据库中</string>
+    <string name="help_build_lyrics_database">帮助VibeFlow 歌词建立歌词数据库</string>
+    <string name="help_build_lyrics_database_description">将您保存的歌词发送到 VibeFlow 歌词数据库中</string>
     <string name="customactivityoncrash_error_activity_close_app">关闭应用</string>
     <string name="customactivityoncrash_error_activity_error_details">错误信息</string>
     <string name="customactivityoncrash_error_activity_error_details_title">错误信息</string>
@@ -245,7 +245,7 @@
     <string name="saved_to_local_playlist">已保存到本地歌单</string>
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">如果您想要取消同步此歌单，请转到本地歌单</string>
     <string name="log_in_to_get_YouTube_playlist">登录以获取 YouTube 歌单</string>
-    <string name="sync_playlist_warning">SimpMusic 将自动创建 YouTube 音乐歌单。确定吗？</string>
+    <string name="sync_playlist_warning">VibeFlow 将自动创建 YouTube 音乐歌单。确定吗？</string>
     <string name="syncing">同步中</string>
     <string name="unsync_playlist_warning">"取消同步此歌单吗？此歌单将不会从 YouTube Music 中删除 "</string>
     <string name="unsyncing">取消同步中</string>
@@ -262,7 +262,7 @@
     <string name="email">邮箱</string>
     <string name="password">密码</string>
     <string name="please_enter_your_email_and_password">请输入你的电子邮箱和密码</string>
-    <string name="translation_language_message">输入语言代码 (例如: en) (2 字符)。如果您想使用 SimpMusic 相同的语言设置，请将编辑框置空。</string>
+    <string name="translation_language_message">输入语言代码 (例如: en) (2 字符)。如果您想使用 VibeFlow 相同的语言设置，请将编辑框置空。</string>
     <string name="invalid_language_code">无效的语言代码</string>
     <string name="lyrics_provider_youtube">歌词 by YouTube</string>
     <string name="lyrics_provider_betterlyrics">歌词由 BetterLyrics 提供</string>
@@ -281,7 +281,7 @@
     <string name="older_first">较早的优先</string>
     <string name="newer_first">较新的在前</string>
     <string name="added_date">已添加日期</string>
-    <string name="credit_app">使用 YouTube Music 作为后端的简单音乐应用 \n\nSimpMusic 是一个开源项目，可以在没有广告和跟踪的情况下从 YouTube 和 YouTube Music 中流式播放音乐。SimpMusic 提供许多功能：\n\n - 流媒体音乐 \n - 同步歌词 \n - 个性化数据 \n -等等… \n\nSimpMusic始终是免费的，没有广告\n\n Tuan Minh Nguyen Duc(Maxrave-dev) 用 ❤️ 构建</string>
+    <string name="credit_app">A modern music streaming app using YouTube Music for backend \n\nVibeFlow is an open source project to stream music from YouTube and YouTube Music without ads and tracking. VibeFlow provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc… \n\nVibeFlow is always free and no ads\n\nMaintained with ❤️ by Prabin Chandra Shrestha (PrabinCode)\nOriginal project: SimpMusic by maxrave-dev</string>
     <string name="issue_tracker">问题跟踪</string>
     <string name="featured_playlists">精选歌单</string>
     <string name="featured_inArtist">精选开启</string>
@@ -320,7 +320,7 @@
     <string name="enable_spotify_lyrics">启用 Spotify 歌词</string>
     <string name="spotify_lyrícs_info">更多没有翻译的歌词</string>
     <string name="enable_canvas">启用 Canvas</string>
-    <string name="canvas_info">在 SimpMusic 中显示 Spotify Canvas</string>
+    <string name="canvas_info">在 VibeFlow 中显示 Spotify Canvas</string>
     <string name="spotify_lyrics_provider">由 Spotify 提供的歌词</string>
     <string name="offline_mode">离线模式</string>
     <string name="added_to_youtube_liked">添加到 YouTube 赞过</string>
@@ -378,7 +378,7 @@
     <string name="loading">加载中</string>
     <string name="updating">更新中</string>
     <string name="go_to_log_in_page">转到登录页面</string>
-    <string name="log_in_warning">YouTube Music现在要求您登录以串流音乐，Piped实例有时也无法正常工作。 您应该登录到 YouTube 以获得更好的 SimpMusic 体验。</string>
+    <string name="log_in_warning">YouTube Music现在要求您登录以串流音乐，Piped实例有时也无法正常工作。 您应该登录到 YouTube 以获得更好的 VibeFlow 体验。</string>
     <string name="spotify_canvas_cache">Spotify Canvas 缓存</string>
     <string name="clear_canvas_cache">清除 canvas 缓存</string>
     <string name="proxy">代理</string>
@@ -418,8 +418,8 @@
     <string name="other_version">其他版本</string>
     <string name="later">稍后询问</string>
     <string name="give_a_star">给颗星星</string>
-    <string name="enjoying_simpmusic">享受SimpMusic吧</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">如果你喜欢SimpMusic，别忘了在Github给SimpMusic点星星或留好评</string>
+    <string name="enjoying_vibeflow">享受VibeFlow吧</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using VibeFlow, consider starring VibeFlow on GitHub</string>
     <string name="if_you_love_my_work_consider">"如果你喜欢我的工作，请考虑： "</string>
     <string name="buying_me_a_coffee">软件称心多雅意，薄酬一杯解劳辛。</string>
     <string name="fade_audio_effect">音频淡入淡出</string>
@@ -472,14 +472,14 @@
     <string name="contributor_name">贡献者名称</string>
     <string name="contributor_email">贡献者邮箱</string>
     <string name="anonymous">匿名</string>
-    <string name="simpmusic_lyrics">SimpMusic 歌词</string>
-    <string name="lyrics_provider_simpmusic">歌词由 BetterLyrics 提供</string>
+    <string name="vibeflow_lyrics">VibeFlow 歌词</string>
+    <string name="lyrics_provider_vibeflow">歌词由 BetterLyrics 提供</string>
     <string name="backup_in_progress">正在备份</string>
     <string name="restore_in_progress">正在还原</string>
     <string name="backup_downloaded">备份已下载数据</string>
     <string name="backup_downloaded_description">备份所有已下载的歌曲数据</string>
     <string name="auto_backup">自动备份</string>
-    <string name="auto_backup_description">自动备份您的数据到 Downloads/SimpMusic 文件夹</string>
+    <string name="auto_backup_description">自动备份您的数据到 Downloads/VibeFlow 文件夹</string>
     <string name="backup_frequency">备份频率</string>
     <string name="daily">每天</string>
     <string name="weekly">每周</string>
@@ -518,8 +518,8 @@
     <string name="intro_login_to_lastfm">登录以记录您听到的内容</string>
     <string name="enable_scrobbling">启用播放记录</string>
     <string name="scrobbling_info">将您播放的内容发送到您的 Last.fm </string>
-    <string name="lastfm_login_step_1">打开 Last.fm 页面并授予SimpMusic 对您账户的访问权限。</string>
-    <string name="lastfm_login_step_2">若您授予访问权限，SimpMusic将再次打开 last.fm 登录页。</string>
+    <string name="lastfm_login_step_1">打开 Last.fm 页面并授予VibeFlow 对您账户的访问权限。</string>
+    <string name="lastfm_login_step_2">若您授予访问权限，VibeFlow将再次打开 last.fm 登录页。</string>
     <string name="lastfm_open_authorize_page">打开 Last.fm</string>
     <string name="lastfm_login_failed">无法登录到 Last.fm，请重试。</string>
     <string name="lastfm_paste_callback_title">没有自动返回？</string>
@@ -554,7 +554,7 @@
     <string name="downvote">点踩</string>
     <string name="vote_submitted">感谢您为这份歌词投票！</string>
     <string name="vote_error">发送失败</string>
-    <string name="open_app">打开 SimpMusic</string>
+    <string name="open_app">打开 VibeFlow</string>
     <string name="close_miniplayer">关闭迷你播放器</string>
     <string name="open_miniplayer">打开迷你播放器</string>
     <string name="quit_app">退出应用</string>
@@ -562,7 +562,7 @@
     <string name="local_tracking_description">将您的收听历史记录到本地数据库</string>
     <string name="blog_notification_title">博客文章通知</string>
     <string name="blog_notification_description">在开发者发布新博文时接收通知</string>
-    <string name="simpmusic_charts">SimpMusic 排行榜</string>
+    <string name="vibeflow_charts">VibeFlow 排行榜</string>
     <string name="crossfading">交叉淡入淡出</string>
     <string name="your_320kbps_url">您的 320kbps URL</string>
     <string name="your_320kbps_url_description">留空则由可用性检查程序自动选择一个有效的 URL。</string>
@@ -579,5 +579,5 @@
     <string name="import_result">已创建 %1$d 播放列表并导入了 %2$d 首歌曲。</string>
     <string name="import_result_skipped">已跳过 %1$d 条目，因为文件中缺少相应的歌曲。</string>
     <string name="import_failed">导入失败</string>
-    <string name="import_invalid_file">此文件不是一个有效的 SimpMusic 导入文件。请先在simpmusic.org转换您的库。</string>
+    <string name="import_invalid_file">This file is not a valid playlist import file.</string>
 </resources>

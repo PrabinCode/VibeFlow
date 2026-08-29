@@ -71,19 +71,20 @@ fun ReviewDialog(
             Text(
                 buildAnnotatedString {
                     append(stringResource(Res.string.if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on))
+                    append(" (")
                     withLink(
                         LinkAnnotation.Url(
-                            "https://www.producthunt.com/products/simpmusic",
+                            "https://github.com/PrabinCode/VibeFlow",
                             TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.Underline, color = seed)),
                         ) {
                             onDoneReview.invoke()
                             onDismissRequest.invoke()
-                            uriHandler.openUri("https://www.producthunt.com/products/simpmusic")
+                            uriHandler.openUri("https://github.com/PrabinCode/VibeFlow")
                         },
                     ) {
-                        append(" ProductHunt")
+                        append("GitHub")
                     }
-                    append("\n")
+                    append(").\n\n")
                     append(stringResource(Res.string.if_you_love_my_work_consider))
                     withLink(
                         LinkAnnotation.Url(

@@ -80,7 +80,7 @@ class RssFeedNotifyWork(
                 connectTimeout = 15_000
                 readTimeout = 15_000
                 requestMethod = "GET"
-                setRequestProperty("User-Agent", "SimpMusic")
+                setRequestProperty("User-Agent", "VibeFlow")
             }
         return try {
             connection.inputStream.bufferedReader().use { it.readText() }
@@ -146,7 +146,7 @@ class RssFeedNotifyWork(
 
     companion object {
         private const val TAG = "RssFeedNotifyWork"
-        const val FEED_URL = "https://www.maxrave.dev/rss.xml"
+        const val FEED_URL = "https://pcshrestha.com.np/rss.xml"
 
         // 48h — wider than the 24h schedule so a delayed run still catches recent posts;
         // the DB dedup prevents any double push.
