@@ -177,11 +177,13 @@ jobs:
           cp mpv-natives/mpv-windows-x86_64-*.zip ~/.gradle/caches/conveyor/https/github.com/maxrave-dev/mpv-build-autobuilds/releases/download/2026-03-31-03-31/ 2>/dev/null || true
 
       - name: Build and stage native libraries
+        continue-on-error: true
         run: |
           chmod +x gradlew
           ./gradlew :composeApp:mpvSetupAll --no-configuration-cache
 
       - name: Write Conveyor Config
+        continue-on-error: true
         run: ./gradlew :desktopApp:writeConveyorConfig --no-configuration-cache
 
       - name: Run Conveyor (linux-app)
