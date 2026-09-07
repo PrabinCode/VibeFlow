@@ -33,25 +33,6 @@ internal class UpdateRepositoryImpl(
 
     override fun checkForFdroidUpdate(): Flow<Resource<UpdateData>> =
         flow {
-            youTube
-                .checkForFdroidUpdate()
-                .onSuccess { response ->
-                    val latestVersion = response.packages.maxBy { it.versionCode }
-                    emit(
-                        Resource.Success(
-                            UpdateData(
-                                tagName = latestVersion.versionName,
-                                releaseTime = null,
-                                body =
-                                    $$"""
-                                    ### Update via F-Droid, changelogs: 
-                                    - https://github.com/PrabinCode/VibeFlow/blob/main/fastlane/metadata/android/en-US/changelogs/$${latestVersion.versionCode}.txt
-                                    """.trimIndent(),
-                            ),
-                        ),
-                    )
-                }.onFailure {
-                    emit(Resource.Error<UpdateData>(it.localizedMessage ?: "Unknown error"))
-                }
+            emit(Resource.Error<UpdateData>("F-Droid builds are currently unavailable for VibeFlow. Please use GitHub Release channel."))
         }.flowOn(Dispatchers.IO)
 }

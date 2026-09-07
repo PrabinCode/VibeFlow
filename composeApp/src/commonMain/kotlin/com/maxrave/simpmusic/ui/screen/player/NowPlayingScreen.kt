@@ -200,7 +200,7 @@ import simpmusic.composeapp.generated.resources.line_synced
 import simpmusic.composeapp.generated.resources.lyrics
 import simpmusic.composeapp.generated.resources.lyrics_provider_betterlyrics
 import simpmusic.composeapp.generated.resources.lyrics_provider_lrc
-import simpmusic.composeapp.generated.resources.lyrics_provider_simpmusic
+import simpmusic.composeapp.generated.resources.lyrics_provider_vibeflow
 import simpmusic.composeapp.generated.resources.lyrics_provider_youtube
 import simpmusic.composeapp.generated.resources.now_playing_upper
 import simpmusic.composeapp.generated.resources.offline_mode
@@ -1081,13 +1081,16 @@ fun NowPlayingScreenContent(
                                                     ambientColor = Color.Transparent,
                                                 ),
                                     ) {
+                                        var artworkUrl by remember(screenDataState.thumbnailURL) {
+                                            mutableStateOf(screenDataState.thumbnailURL)
+                                        }
                                         AsyncImage(
                                             model =
                                                 ImageRequest
                                                     .Builder(LocalPlatformContext.current)
-                                                    .data(screenDataState.thumbnailURL)
+                                                    .data(artworkUrl)
                                                     .diskCachePolicy(CachePolicy.ENABLED)
-                                                    .diskCacheKey(screenDataState.thumbnailURL + "BIGGER")
+                                                    .diskCacheKey(artworkUrl + "BIGGER")
                                                     .crossfade(550)
                                                     .build(),
                                             contentDescription = "",
@@ -1095,6 +1098,12 @@ fun NowPlayingScreenContent(
                                                 sharedViewModel.setBitmap(
                                                     it.result.image.toImageBitmap(),
                                                 )
+                                            },
+                                            onError = {
+                                                val fallback = artworkUrl?.replace("maxresdefault", "hqdefault")
+                                                if (fallback != null && fallback != artworkUrl) {
+                                                    artworkUrl = fallback
+                                                }
                                             },
                                             contentScale = ContentScale.Crop,
                                             placeholder = rememberHolderPainter(),
@@ -2305,7 +2314,7 @@ fun NowPlayingScreenContent(
                                             text =
                                                 when (screenDataState.lyricsData?.lyricsProvider) {
                                                     LyricsProvider.SIMPMUSIC -> {
-                                                        stringResource(Res.string.lyrics_provider_simpmusic)
+                                                        stringResource(Res.string.lyrics_provider_vibeflow)
                                                     }
 
                                                     LyricsProvider.LRCLIB -> {

@@ -184,10 +184,15 @@ class MainAppWidget :
                         }
                 }
 
+                val effectiveBg = if (bgColor != Color.Black) bgColor else Color(0xFF1E1E24)
+                val displayTitle = title.ifBlank { "VibeFlow" }
+                val displayArtist = artist.ifBlank { "Tap to play" }
+
                 Box(
                     GlanceModifier
                         .fillMaxSize()
-                        .background(ColorProvider(bgColor))
+                        .cornerRadius(16.dp)
+                        .background(ColorProvider(effectiveBg))
                         .clickable(actionStartActivity<MainActivity>()),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -207,17 +212,28 @@ class MainAppWidget :
                             randomImage?.let {
                                 Image(
                                     provider = ImageProvider(it),
-                                    contentDescription = "",
+                                    contentDescription = "Track Artwork",
                                     contentScale = ContentScale.FillBounds,
                                     modifier =
                                         GlanceModifier
                                             .fillMaxSize()
                                             .cornerRadius(12.dp),
                                 )
-                            } ?: CircularProgressIndicator(
-                                GlanceModifier.size(24.dp),
-                                color = ColorProvider(Color.White),
-                            )
+                            } ?: run {
+                                if (title.isNotBlank()) {
+                                    CircularProgressIndicator(
+                                        GlanceModifier.size(24.dp),
+                                        color = ColorProvider(Color.White),
+                                    )
+                                } else {
+                                    Image(
+                                        provider = ImageProvider(R.drawable.holder),
+                                        contentDescription = "Placeholder",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = GlanceModifier.fillMaxSize().cornerRadius(12.dp),
+                                    )
+                                }
+                            }
                         }
                         Column(
                             GlanceModifier.fillMaxWidth().defaultWeight().padding(
@@ -227,7 +243,7 @@ class MainAppWidget :
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = title,
+                                text = displayTitle,
                                 style =
                                     TextStyle(
                                         color = ColorProvider(Color.White),
@@ -242,7 +258,7 @@ class MainAppWidget :
                                         .wrapContentHeight(),
                             )
                             Text(
-                                text = artist,
+                                text = displayArtist,
                                 style =
                                     TextStyle(
                                         color = ColorProvider(Color.LightGray),

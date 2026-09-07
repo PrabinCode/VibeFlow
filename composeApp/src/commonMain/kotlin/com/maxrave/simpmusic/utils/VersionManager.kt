@@ -25,4 +25,24 @@ object VersionManager {
             versionName
         }
     }
+
+    fun isNewerVersion(remoteTag: String): Boolean {
+        val cleanRemote = remoteTag.trim().removePrefix("v").removePrefix("V").split("-")[0]
+        val cleanCurrent = getVersionName().trim().removePrefix("v").removePrefix("V").split("-")[0]
+        val remoteParts = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
+        val currentParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
+
+        if (remoteParts.isEmpty() || currentParts.isEmpty()) {
+            return remoteTag != getVersionName() && remoteTag.isNotBlank()
+        }
+
+        val maxLen = maxOf(remoteParts.size, currentParts.size)
+        for (i in 0 until maxLen) {
+            val r = remoteParts.getOrElse(i) { 0 }
+            val c = currentParts.getOrElse(i) { 0 }
+            if (r > c) return true
+            if (r < c) return false
+        }
+        return false
+    }
 }

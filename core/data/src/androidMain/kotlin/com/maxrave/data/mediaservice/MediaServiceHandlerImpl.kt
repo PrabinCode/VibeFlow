@@ -285,6 +285,22 @@ internal class MediaServiceHandlerImpl(
         getFormatJob = Job()
         jobWatchtime = Job()
         skipSilent = runBlocking { dataStoreManager.skipSilent.first() == TRUE }
+        // Collected rather than read once: equalizer adjustments while playing take effect immediately.
+        coroutineScope.launch {
+            combine(
+                dataStoreManager.equalizerEnabled,
+                dataStoreManager.equalizerBands,
+                dataStoreManager.equalizerPreamp,
+            ) { enabled, bands, preamp -> Triple(enabled == TRUE, bands, preamp) }
+                .distinctUntilChanged()
+                .collect { (enabled, bands, preamp) ->
+                    player.setEqualizer(
+                        bandsDb =
+                            if (enabled) bands.split(",").mapNotNull { it.trim().toFloatOrNull() } else emptyList(),
+                        preampDb = if (enabled) preamp else 0f,
+                    )
+                }
+        }
         normalizeVolume =
             runBlocking { dataStoreManager.normalizeVolume.first() == TRUE }
         _nowPlaying.value = player.currentMediaItem

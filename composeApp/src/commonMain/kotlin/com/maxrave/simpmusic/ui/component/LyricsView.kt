@@ -100,6 +100,7 @@ import com.maxrave.simpmusic.extension.ParsedRichSyncLine
 import com.maxrave.simpmusic.extension.animateScrollAndCentralizeItem
 import com.maxrave.simpmusic.extension.formatDuration
 import com.maxrave.simpmusic.extension.hsvToColor
+import com.maxrave.simpmusic.extension.LyricsRomanizationEngine
 import com.maxrave.simpmusic.extension.parseRichSyncWords
 import com.maxrave.simpmusic.ui.icon.Info
 import com.maxrave.simpmusic.ui.icon.MoreVert
@@ -262,6 +263,7 @@ fun LyricsView(
     val listState = rememberLazyListState()
     val current by timeLine.collectAsStateWithLifecycle()
     val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
+    val lyricsRomanization by dataStoreManager.lyricsRomanization.collectAsStateWithLifecycle(DataStoreManager.TRUE)
 
     val timedLineIndexes =
         remember(lyricsData.lyrics.lines) {
@@ -319,6 +321,14 @@ fun LyricsView(
                     }
 
                 line?.words?.let { words ->
+                    val romanizedWords = remember(words, lyricsRomanization) {
+                        if (lyricsRomanization == DataStoreManager.TRUE) {
+                            LyricsRomanizationEngine.romanize(words)
+                        } else {
+                            null
+                        }
+                    }
+
                     val clickAction: () -> Unit = {
                         if (isShareMode) {
                             onToggleSelectLine?.invoke(index)
@@ -341,6 +351,7 @@ fun LyricsView(
                                 RichSyncLyricsLineItem(
                                     parsedLine = parsedLine,
                                     translatedWords = translatedWords,
+                                    romanizedWords = romanizedWords,
                                     currentTimeMs = (current.current + lyricsOffset).coerceAtLeast(0L),
                                     isCurrent = index == currentLineIndex,
                                     isSelected = isSelected,
@@ -351,6 +362,7 @@ fun LyricsView(
                                 LyricsLineItem(
                                     originalWords = words,
                                     translatedWords = translatedWords,
+                                    romanizedWords = romanizedWords,
                                     isBold = index <= currentLineIndex,
                                     isCurrent = index == currentLineIndex,
                                     isSelected = isSelected,
@@ -364,6 +376,7 @@ fun LyricsView(
                             LyricsLineItem(
                                 originalWords = words,
                                 translatedWords = translatedWords,
+                                romanizedWords = romanizedWords,
                                 isBold = index <= currentLineIndex || lyricsData.lyrics.syncType != "LINE_SYNCED",
                                 isCurrent = index == currentLineIndex || lyricsData.lyrics.syncType != "LINE_SYNCED",
                                 isSelected = isSelected,
@@ -384,6 +397,7 @@ fun LyricsView(
 fun LyricsLineItem(
     originalWords: String,
     translatedWords: String?,
+    romanizedWords: String? = null,
     isBold: Boolean,
     isCurrent: Boolean = false,
     isSelected: Boolean = false,
@@ -412,6 +426,13 @@ fun LyricsLineItem(
                         style = typo().headlineLarge,
                         color = if (isCurrent || isSelected) Color.White else DimOriginalColor,
                     )
+                    if (romanizedWords != null) {
+                        Text(
+                            text = romanizedWords,
+                            style = typo().titleSmall,
+                            color = if (isCurrent) Color(0xFF81D4FA) else DimOriginalColor.copy(alpha = 0.6f),
+                        )
+                    }
                     if (translatedWords != null) {
                         Text(
                             text = translatedWords,
@@ -433,6 +454,13 @@ fun LyricsLineItem(
                     style = typo().headlineMedium,
                     color = if (isSelected) Color.White else DimOriginalColor,
                 )
+                if (romanizedWords != null) {
+                    Text(
+                        text = romanizedWords,
+                        style = typo().bodySmall,
+                        color = DimOriginalColor.copy(alpha = 0.5f),
+                    )
+                }
                 if (translatedWords != null) {
                     Text(
                         text = translatedWords,
@@ -451,6 +479,7 @@ fun LyricsLineItem(
 fun RichSyncLyricsLineItem(
     parsedLine: ParsedRichSyncLine,
     translatedWords: String?,
+    romanizedWords: String? = null,
     currentTimeMs: Long,
     isCurrent: Boolean,
     isSelected: Boolean = false,
@@ -516,6 +545,14 @@ fun RichSyncLyricsLineItem(
                     customFontSize = customFontSize,
                 )
             }
+        }
+
+        if (romanizedWords != null) {
+            Text(
+                text = romanizedWords,
+                style = typo().titleSmall,
+                color = if (isCurrent) Color(0xFF81D4FA) else DimOriginalColor.copy(alpha = 0.6f),
+            )
         }
 
         // Translated lyrics (line-level, no word sync)

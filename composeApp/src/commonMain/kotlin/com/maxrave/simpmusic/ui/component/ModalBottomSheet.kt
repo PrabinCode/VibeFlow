@@ -257,7 +257,7 @@ import simpmusic.composeapp.generated.resources.set
 import simpmusic.composeapp.generated.resources.share
 import simpmusic.composeapp.generated.resources.share_lyrics
 import simpmusic.composeapp.generated.resources.share_url
-import simpmusic.composeapp.generated.resources.simpmusic_lyrics
+import simpmusic.composeapp.generated.resources.vibeflow_lyrics
 import simpmusic.composeapp.generated.resources.sleep_minutes
 import simpmusic.composeapp.generated.resources.sleep_timer
 import simpmusic.composeapp.generated.resources.sleep_timer_end_of_song
@@ -1563,7 +1563,7 @@ fun NowPlayingBottomSheet(
                     ) {
                         RadioButton(selected = selected == 0, onClick = { selected = 0 })
                         Spacer(modifier = Modifier.size(10.dp))
-                        Text(text = stringResource(Res.string.simpmusic_lyrics), style = typo().labelSmall)
+                        Text(text = stringResource(Res.string.vibeflow_lyrics), style = typo().labelSmall)
                     }
                     Row(
                         modifier =

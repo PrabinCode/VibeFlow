@@ -33,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -139,8 +140,12 @@ fun App(viewModel: SharedViewModel = koinInject()) {
     val themeColorSource by viewModel.getThemeColorSource().collectAsStateWithLifecycle(DataStoreManager.THEME_COLOR_DEFAULT)
     val customThemeColorHex by viewModel.getCustomThemeColor().collectAsStateWithLifecycle(DataStoreManager.DEFAULT_THEME_COLOR_HEX)
     // MiniPlayer visibility logic
-    var isShowMiniPlayer by rememberSaveable {
-        mutableStateOf(true)
+    // MiniPlayer visibility: derived, never stored.
+    val isShowMiniPlayer by remember {
+        derivedStateOf {
+            val item = nowPlayingData?.mediaItem
+            item != null && item != GenericMediaItem.EMPTY
+        }
     }
 
     // Now playing screen
@@ -166,16 +171,12 @@ fun App(viewModel: SharedViewModel = koinInject()) {
             blurEnabled = true,
         )
 
-    LaunchedEffect(nowPlayingData) {
-        isShowMiniPlayer = !(nowPlayingData?.mediaItem == null || nowPlayingData?.mediaItem == GenericMediaItem.EMPTY)
-    }
-
     LaunchedEffect(intent) {
         val intent = intent ?: return@LaunchedEffect
         val data = intent.data
         Logger.d("MainActivity", "onCreate: $data")
         if (data != null) {
-            if (data == "simpmusic://notification".toUri()) {
+            if (data == "simpmusic://notification".toUri() || data == "vibeflow://notification".toUri()) {
                 viewModel.setIntent(null)
                 navController.navigate(
                     NotificationDestination,
@@ -192,23 +193,15 @@ fun App(viewModel: SharedViewModel = koinInject()) {
                 // of it. The token is handed straight to the shared view model, and the screen
                 // closes itself when it sees a session key appear.
                 token?.let { viewModel.completeLastfmLogin(it) }
-            } else if (data.host == "simpmusic.org" || data.scheme == "simpmusic") {
-                // https://simpmusic.org/app/watch?v=VIDEO_ID
-                // https://simpmusic.org/app/playlist?list=PLAYLIST_ID
-                // https://simpmusic.org/app/channel/CHANNEL_ID
-                // simpmusic://watch?v=VIDEO_ID  (host="watch", no path)
-                // simpmusic://playlist?list=PLAYLIST_ID
-                // simpmusic://channel/CHANNEL_ID
+            } else if (data.host == "simpmusic.org" || data.scheme == "simpmusic" || data.scheme == "vibeflow") {
                 val segments = data.pathSegments
-                // For simpmusic.org: segments = ["app", "watch"] → appPath = segments[1]
-                // For simpmusic://: host IS the appPath (e.g. host="watch"), segments = []
                 val appPath =
-                    if (data.scheme == "simpmusic") {
+                    if (data.scheme == "simpmusic" || data.scheme == "vibeflow") {
                         data.host
                     } else {
                         segments.getOrNull(1)
                     }
-                Logger.d("MainActivity", "simpmusic.org deep link, appPath: $appPath")
+                Logger.d("MainActivity", "Deep link, appPath: $appPath")
                 viewModel.setIntent(null)
                 when (appPath) {
                     "watch" -> {
@@ -323,7 +316,7 @@ fun App(viewModel: SharedViewModel = koinInject()) {
     LaunchedEffect(updateData) {
         val response = updateData ?: return@LaunchedEffect
         if (viewModel.showedUpdateDialog &&
-            response.tagName != getString(Res.string.version_format, VersionManager.getVersionName())
+            VersionManager.isNewerVersion(response.tagName)
         ) {
             shouldShowUpdateDialog = true
         }

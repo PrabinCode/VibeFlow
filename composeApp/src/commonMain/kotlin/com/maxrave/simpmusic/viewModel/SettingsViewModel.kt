@@ -239,6 +239,21 @@ class SettingsViewModel(
     private var _killServiceOnExit: MutableStateFlow<String?> = MutableStateFlow(null)
     val killServiceOnExit: StateFlow<String?> = _killServiceOnExit
 
+    private val _equalizerEnabled = MutableStateFlow(false)
+    val equalizerEnabled: StateFlow<Boolean> = _equalizerEnabled
+
+    private val _equalizerBands = MutableStateFlow(List(EQUALIZER_BAND_COUNT) { 0f })
+    val equalizerBands: StateFlow<List<Float>> = _equalizerBands
+
+    private val _equalizerPreamp = MutableStateFlow(0f)
+    val equalizerPreamp: StateFlow<Float> = _equalizerPreamp
+
+    private val _equalizerAutoEqProfile = MutableStateFlow("")
+    val equalizerAutoEqProfile: StateFlow<String> = _equalizerAutoEqProfile
+
+    private val _lyricsRomanization = MutableStateFlow(true)
+    val lyricsRomanization: StateFlow<Boolean> = _lyricsRomanization
+
     init {
         getYoutubeSubtitleLanguage()
         getHelpBuildLyricsDatabase()
@@ -249,6 +264,80 @@ class SettingsViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            launch {
+                dataStoreManager.equalizerEnabled.collect { _equalizerEnabled.emit(it == DataStoreManager.TRUE) }
+            }
+            launch {
+                dataStoreManager.equalizerBands.collect { raw ->
+                    val parsed = raw.split(",").mapNotNull { it.trim().toFloatOrNull() }
+                    _equalizerBands.emit(
+                        if (parsed.size == EQUALIZER_BAND_COUNT) parsed else List(EQUALIZER_BAND_COUNT) { 0f },
+                    )
+                }
+            }
+            launch {
+                dataStoreManager.equalizerPreamp.collect { _equalizerPreamp.emit(it) }
+            }
+            launch {
+                dataStoreManager.equalizerAutoEqProfile.collect { _equalizerAutoEqProfile.emit(it) }
+            }
+            launch {
+                dataStoreManager.lyricsRomanization.collect { _lyricsRomanization.emit(it == DataStoreManager.TRUE) }
+            }
+        }
+    }
+
+    fun setLyricsRomanization(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setLyricsRomanization(enabled)
+        }
+    }
+
+    fun setEqualizerEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerEnabled(enabled)
+        }
+    }
+
+    fun setEqualizerBands(bandsDb: List<Float>) {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerBands(bandsDb)
+        }
+    }
+
+    fun applyEqualizerPreset(
+        bandsDb: List<Float>,
+        preampDb: Float,
+    ) {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerPreamp(preampDb)
+            dataStoreManager.setEqualizerBands(bandsDb)
+        }
+    }
+
+    fun setEqualizerPreamp(preampDb: Float) {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerPreamp(preampDb)
+        }
+    }
+
+    fun resetEqualizer() {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerBands(List(EQUALIZER_BAND_COUNT) { 0f })
+            dataStoreManager.setEqualizerPreamp(0f)
+            dataStoreManager.setEqualizerAutoEqProfile("")
+        }
+    }
+
+    fun setEqualizerAutoEqProfile(profile: String) {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerAutoEqProfile(profile)
+        }
+    }
+
+    fun getEqualizer() {
+        // Equalizer state is collected continuously in init block
     }
 
     fun getAudioSessionId() = mediaPlayerHandler.player.audioSessionId
@@ -1768,3 +1857,9 @@ expect fun getPackageName(): String
 expect fun getFileDir(): String
 
 expect fun changeLanguageNative(code: String)
+
+/** Number of equalizer bands, matching the ISO centres the audio processor installs. */
+const val EQUALIZER_BAND_COUNT = 10
+
+/** Band centre labels, for display only — the backend owns the actual frequencies. */
+val EQUALIZER_BAND_LABELS = listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k")

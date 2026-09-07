@@ -150,93 +150,179 @@ object SUPPORTED_LOCATION {
             "ZA",
             "ZW",
         )
+
+    val countryNames: Map<String, String> =
+        mapOf(
+            "AE" to "United Arab Emirates",
+            "AR" to "Argentina",
+            "AT" to "Austria",
+            "AU" to "Australia",
+            "AZ" to "Azerbaijan",
+            "BA" to "Bosnia and Herzegovina",
+            "BD" to "Bangladesh",
+            "BE" to "Belgium",
+            "BG" to "Bulgaria",
+            "BH" to "Bahrain",
+            "BO" to "Bolivia",
+            "BR" to "Brazil",
+            "BY" to "Belarus",
+            "CA" to "Canada",
+            "CH" to "Switzerland",
+            "CL" to "Chile",
+            "CO" to "Colombia",
+            "CR" to "Costa Rica",
+            "CY" to "Cyprus",
+            "CZ" to "Czechia",
+            "DE" to "Germany",
+            "DK" to "Denmark",
+            "DO" to "Dominican Republic",
+            "DZ" to "Algeria",
+            "EC" to "Ecuador",
+            "EE" to "Estonia",
+            "EG" to "Egypt",
+            "ES" to "Spain",
+            "FI" to "Finland",
+            "FR" to "France",
+            "GB" to "United Kingdom",
+            "GE" to "Georgia",
+            "GH" to "Ghana",
+            "GR" to "Greece",
+            "GT" to "Guatemala",
+            "HK" to "Hong Kong",
+            "HN" to "Honduras",
+            "HR" to "Croatia",
+            "HU" to "Hungary",
+            "ID" to "Indonesia",
+            "IE" to "Ireland",
+            "IL" to "Israel",
+            "IN" to "India",
+            "IQ" to "Iraq",
+            "IS" to "Iceland",
+            "IT" to "Italy",
+            "JM" to "Jamaica",
+            "JO" to "Jordan",
+            "JP" to "Japan",
+            "KE" to "Kenya",
+            "KH" to "Cambodia",
+            "KR" to "South Korea",
+            "KW" to "Kuwait",
+            "KZ" to "Kazakhstan",
+            "LA" to "Laos",
+            "LB" to "Lebanon",
+            "LI" to "Liechtenstein",
+            "LK" to "Sri Lanka",
+            "LT" to "Lithuania",
+            "LU" to "Luxembourg",
+            "LV" to "Latvia",
+            "LY" to "Libya",
+            "MA" to "Morocco",
+            "ME" to "Montenegro",
+            "MK" to "North Macedonia",
+            "MT" to "Malta",
+            "MX" to "Mexico",
+            "MY" to "Malaysia",
+            "NG" to "Nigeria",
+            "NI" to "Nicaragua",
+            "NL" to "Netherlands",
+            "NO" to "Norway",
+            "NP" to "Nepal",
+            "NZ" to "New Zealand",
+            "OM" to "Oman",
+            "PA" to "Panama",
+            "PE" to "Peru",
+            "PG" to "Papua New Guinea",
+            "PH" to "Philippines",
+            "PK" to "Pakistan",
+            "PL" to "Poland",
+            "PR" to "Puerto Rico",
+            "PT" to "Portugal",
+            "PY" to "Paraguay",
+            "QA" to "Qatar",
+            "RO" to "Romania",
+            "RS" to "Serbia",
+            "RU" to "Russia",
+            "SA" to "Saudi Arabia",
+            "SE" to "Sweden",
+            "SG" to "Singapore",
+            "SI" to "Slovenia",
+            "SK" to "Slovakia",
+            "SN" to "Senegal",
+            "SV" to "El Salvador",
+            "TH" to "Thailand",
+            "TN" to "Tunisia",
+            "TR" to "Turkey",
+            "TW" to "Taiwan",
+            "TZ" to "Tanzania",
+            "UA" to "Ukraine",
+            "UG" to "Uganda",
+            "US" to "United States",
+            "UY" to "Uruguay",
+            "VE" to "Venezuela",
+            "VN" to "Vietnam",
+            "YE" to "Yemen",
+            "ZA" to "South Africa",
+            "ZW" to "Zimbabwe",
+        )
+
+    fun getCountryName(countryCode: String?): String {
+        if (countryCode.isNullOrBlank()) return ""
+        val upper = countryCode.uppercase()
+        return countryNames[upper] ?: upper
+    }
+
+    fun getCountryFlag(countryCode: String?): String {
+        if (countryCode == null || countryCode.length != 2) return ""
+        val c1 = countryCode[0].uppercaseChar()
+        val c2 = countryCode[1].uppercaseChar()
+        if (c1 !in 'A'..'Z' || c2 !in 'A'..'Z') return ""
+        val high = 0xD83C.toChar()
+        val low1 = (0xDDE6 + (c1 - 'A')).toChar()
+        val low2 = (0xDDE6 + (c2 - 'A')).toChar()
+        return "$high$low1$high$low2"
+    }
+
+    fun getDisplayName(countryCode: String?): String {
+        if (countryCode.isNullOrBlank()) return ""
+        val code = countryCode.uppercase()
+        val name = countryNames[code] ?: return code
+        val flag = getCountryFlag(code)
+        return if (flag.isNotEmpty()) "$flag $name ($code)" else "$name ($code)"
+    }
+
+    fun getCodeFromDisplayName(displayName: String): String {
+        val trimmed = displayName.trim()
+        val match = Regex("""\(([A-Z]{2})\)""").find(trimmed)
+        if (match != null) {
+            return match.groupValues[1]
+        }
+        return countryNames.entries.firstOrNull { it.value.equals(trimmed, ignoreCase = true) }?.key
+            ?: trimmed
+    }
+
+    val displayList: List<Pair<String, String>> by lazy {
+        items.map { item ->
+            val code = item.toString()
+            code to getDisplayName(code)
+        }.sortedBy { it.second.substringAfter(" ") }
+    }
 }
 
 object SUPPORTED_LANGUAGE {
     val items: Array<CharSequence> =
         arrayOf(
             "English",
-            "Tiếng Việt",
-            "Italiano",
-            "Deutsch",
-            "Русский",
-            "Türkçe",
-            "Suomi",
-            "Polski",
-            "Português",
-            "Français",
-            "Español",
-            "简体中文 (Simplified Chinese)",
-            "Bahasa Indonesia",
-            "اللغة العربية",
-            "日本語",
-            "繁體中文 (Traditional Chinese)",
-            "Українська",
-            "עברית",
-            "Azerbaijani",
-            "हिन्दी",
-            "ภาษาไทย",
-            "Nederlands",
-            "한국어",
-            "Català",
-            "فارسی",
-            "български",
         )
     val codes: Array<String> =
         arrayOf(
             "en-US",
-            "vi-VN",
-            "it-IT",
-            "de-DE",
-            "ru-RU",
-            "tr-TR",
-            "fi-FI",
-            "pl-PL",
-            "pt-PT",
-            "fr-FR",
-            "es-ES",
-            "zh-CN",
-            "id-ID",
-            "ar-SA",
-            "ja-JP",
-            "zh-Hant-TW",
-            "uk-UA",
-            "iw-IL",
-            "az-AZ",
-            "hi-IN",
-            "th-TH",
-            "nl-NL",
-            "ko-KR",
-            "ca-ES",
-            "fa-AF",
-            "bg-BG",
         )
 
     fun getLanguageFromCode(code: String?): String {
-        val index =
-            codes.indexOf(
-                if (code == "he-IL") {
-                    "iw-IL"
-                } else {
-                    code
-                },
-            )
-        Logger.d("Config", "getLanguageFromCode: $code")
-        Logger.w("Config", "getLanguageFromCode: ${items.getOrNull(index)}")
-        if (index == -1) {
-            return "English"
-        }
-        return (items.getOrNull(index) ?: "English").toString()
+        return "English"
     }
 
     fun getCodeFromLanguage(language: String?): String {
-        val index = items.indexOf(language ?: "English")
-        Logger.d("Config", "getCodeFromLanguage: $index")
-        if (index == -1) {
-            return "en-US"
-        }
-        Logger.w("Config", "getCodeFromLanguage: ${codes.getOrNull(index)}")
-        return (codes.getOrNull(index) ?: "en-US")
+        return "en-US"
     }
 }
 

@@ -353,11 +353,14 @@ fun AppleMusicPlayerView(
                             },
                         color = Color.DarkGray.copy(alpha = 0.4f),
                     ) {
+                        var artworkUrl by remember(screenDataState.thumbnailURL) {
+                            mutableStateOf(screenDataState.thumbnailURL)
+                        }
                         AsyncImage(
                             model = ImageRequest.Builder(LocalPlatformContext.current)
-                                .data(screenDataState.thumbnailURL)
+                                .data(artworkUrl)
                                 .diskCachePolicy(CachePolicy.ENABLED)
-                                .diskCacheKey(screenDataState.thumbnailURL + "BIGGER")
+                                .diskCacheKey(artworkUrl + "BIGGER")
                                 .crossfade(400)
                                 .build(),
                             contentDescription = screenDataState.nowPlayingTitle,
@@ -366,6 +369,12 @@ fun AppleMusicPlayerView(
                             error = rememberHolderPainter(),
                             onSuccess = { state ->
                                 onSetBitmap(state.result.image.toImageBitmap())
+                            },
+                            onError = {
+                                val fallback = artworkUrl?.replace("maxresdefault", "hqdefault")
+                                if (fallback != null && fallback != artworkUrl) {
+                                    artworkUrl = fallback
+                                }
                             },
                             modifier = Modifier.fillMaxSize(),
                         )

@@ -154,6 +154,26 @@ interface DataStoreManager {
 
     suspend fun setPlayerVolume(volume: Float)
 
+    val equalizerEnabled: Flow<String>
+
+    suspend fun setEqualizerEnabled(enabled: Boolean)
+
+    val equalizerBands: Flow<String>
+
+    suspend fun setEqualizerBands(bandsDb: List<Float>)
+
+    val equalizerPreamp: Flow<Float>
+
+    suspend fun setEqualizerPreamp(preampDb: Float)
+
+    val equalizerAutoEqProfile: Flow<String>
+
+    suspend fun setEqualizerAutoEqProfile(name: String)
+
+    val lyricsRomanization: Flow<String>
+
+    suspend fun setLyricsRomanization(enabled: Boolean)
+
     val videoQuality: Flow<String>
 
     suspend fun setVideoQuality(quality: String)

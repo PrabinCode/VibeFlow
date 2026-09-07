@@ -238,6 +238,8 @@ import simpmusic.composeapp.generated.resources.enable_liquid_glass_effect_descr
 import simpmusic.composeapp.generated.resources.enable_rich_presence
 import simpmusic.composeapp.generated.resources.enable_sponsor_block
 import simpmusic.composeapp.generated.resources.enable_spotify_lyrics
+import simpmusic.composeapp.generated.resources.equalizer
+import simpmusic.composeapp.generated.resources.equalizer_description
 import simpmusic.composeapp.generated.resources.free_space
 import simpmusic.composeapp.generated.resources.gemini
 import simpmusic.composeapp.generated.resources.guest
@@ -291,6 +293,8 @@ import simpmusic.composeapp.generated.resources.lrclib
 import simpmusic.composeapp.generated.resources.lyrics
 import simpmusic.composeapp.generated.resources.lyrics_offset
 import simpmusic.composeapp.generated.resources.lyrics_offset_description
+import simpmusic.composeapp.generated.resources.lyrics_romanization
+import simpmusic.composeapp.generated.resources.lyrics_romanization_description
 import simpmusic.composeapp.generated.resources.main_lyrics_provider
 import simpmusic.composeapp.generated.resources.manage_your_youtube_accounts
 import simpmusic.composeapp.generated.resources.maxrave_dev
@@ -334,7 +338,7 @@ import simpmusic.composeapp.generated.resources.send_back_listening_data_to_goog
 import simpmusic.composeapp.generated.resources.set
 import simpmusic.composeapp.generated.resources.settings
 import simpmusic.composeapp.generated.resources.signed_in
-import simpmusic.composeapp.generated.resources.simpmusic_lyrics
+import simpmusic.composeapp.generated.resources.vibeflow_lyrics
 import simpmusic.composeapp.generated.resources.skip_no_music_part
 import simpmusic.composeapp.generated.resources.skip_silent
 import simpmusic.composeapp.generated.resources.skip_sponsor_part_of_video
@@ -478,6 +482,7 @@ fun SettingScreen(
     val killServiceOnExit by remember { viewModel.killServiceOnExit.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = true)
     val mainLyricsProvider by viewModel.mainLyricsProvider.collectAsStateWithLifecycle()
     val lyricsOffset by viewModel.lyricsOffset.collectAsStateWithLifecycle()
+    val lyricsRomanization by viewModel.lyricsRomanization.collectAsStateWithLifecycle(true)
     val youtubeSubtitleLanguage by viewModel.youtubeSubtitleLanguage.collectAsStateWithLifecycle()
     val spotifyLoggedIn by viewModel.spotifyLogIn.collectAsStateWithLifecycle()
     val spotifyLyrics by viewModel.spotifyLyrics.collectAsStateWithLifecycle()
@@ -531,6 +536,7 @@ fun SettingScreen(
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDuration.collectAsStateWithLifecycle()
     val crossfadeDjMode by viewModel.crossfadeDjMode.collectAsStateWithLifecycle()
+    val equalizerEnabled by viewModel.equalizerEnabled.collectAsStateWithLifecycle(initialValue = false)
     val castState by viewModel.castState.collectAsStateWithLifecycle()
 
     val isCheckingUpdate by sharedViewModel.isCheckingUpdate.collectAsStateWithLifecycle()
@@ -759,23 +765,25 @@ fun SettingScreen(
                 )
                 SettingItem(
                     title = stringResource(Res.string.content_country),
-                    subtitle = location ?: "",
+                    subtitle = SUPPORTED_LOCATION.getDisplayName(location ?: "US"),
                     onClick = {
+                        val currentLoc = location ?: "US"
                         viewModel.setAlertData(
                             SettingAlertState(
                                 title = runBlocking { getString(Res.string.content_country) },
                                 selectOne =
                                     SettingAlertState.SelectData(
                                         listSelect =
-                                            SUPPORTED_LOCATION.items.map { item ->
-                                                (item.toString() == location) to item.toString()
+                                            SUPPORTED_LOCATION.displayList.map { (code, display) ->
+                                                (code == currentLoc) to display
                                             },
                                     ),
                                 confirm =
                                     runBlocking { getString(Res.string.change) } to { state ->
-                                        viewModel.changeLocation(
-                                            state.selectOne?.getSelected() ?: "US",
-                                        )
+                                        val selected = state.selectOne?.getSelected() ?: ""
+                                        val code =
+                                            SUPPORTED_LOCATION.getCodeFromDisplayName(selected).ifEmpty { "US" }
+                                        viewModel.changeLocation(code)
                                     },
                                 dismiss = runBlocking { getString(Res.string.cancel) },
                             ),
@@ -1109,6 +1117,14 @@ fun SettingScreen(
                         switch = (skipSilent to { viewModel.setSkipSilent(it) }),
                     )
                     SettingItem(
+                        title = stringResource(Res.string.equalizer),
+                        subtitle = stringResource(Res.string.equalizer_description),
+                        switch = (equalizerEnabled to { viewModel.setEqualizerEnabled(it) }),
+                    )
+                    AnimatedVisibility(visible = equalizerEnabled) {
+                        EqualizerSection(viewModel)
+                    }
+                    SettingItem(
                         title = stringResource(Res.string.open_system_equalizer),
                         subtitle =
                             if (castState.isRemote) {
@@ -1267,7 +1283,7 @@ fun SettingScreen(
                     title = stringResource(Res.string.main_lyrics_provider),
                     subtitle =
                         when (mainLyricsProvider) {
-                            DataStoreManager.SIMPMUSIC -> stringResource(Res.string.simpmusic_lyrics)
+                            DataStoreManager.SIMPMUSIC -> stringResource(Res.string.vibeflow_lyrics)
                             DataStoreManager.YOUTUBE -> stringResource(Res.string.youtube_transcript)
                             DataStoreManager.LRCLIB -> stringResource(Res.string.lrclib)
                             DataStoreManager.BETTER_LYRICS -> stringResource(Res.string.better_lyrics)
@@ -1282,7 +1298,7 @@ fun SettingScreen(
                                         listSelect =
                                             listOf(
                                                 (mainLyricsProvider == DataStoreManager.SIMPMUSIC) to
-                                                    runBlocking { getString(Res.string.simpmusic_lyrics) },
+                                                    runBlocking { getString(Res.string.vibeflow_lyrics) },
                                                 (mainLyricsProvider == DataStoreManager.YOUTUBE) to
                                                     runBlocking { getString(Res.string.youtube_transcript) },
                                                 (mainLyricsProvider == DataStoreManager.LRCLIB) to runBlocking { getString(Res.string.lrclib) },
@@ -1294,7 +1310,7 @@ fun SettingScreen(
                                     runBlocking { getString(Res.string.change) } to { state ->
                                         viewModel.setLyricsProvider(
                                             when (state.selectOne?.getSelected()) {
-                                                runBlocking { getString(Res.string.simpmusic_lyrics) } -> DataStoreManager.SIMPMUSIC
+                                                runBlocking { getString(Res.string.vibeflow_lyrics) } -> DataStoreManager.SIMPMUSIC
                                                 runBlocking { getString(Res.string.youtube_transcript) } -> DataStoreManager.YOUTUBE
                                                 runBlocking { getString(Res.string.lrclib) } -> DataStoreManager.LRCLIB
                                                 runBlocking { getString(Res.string.better_lyrics) } -> DataStoreManager.BETTER_LYRICS
@@ -1314,6 +1330,12 @@ fun SettingScreen(
                     onClick = {
                         showLyricsOffsetSheet = true
                     },
+                )
+
+                SettingItem(
+                    title = stringResource(Res.string.lyrics_romanization),
+                    subtitle = stringResource(Res.string.lyrics_romanization_description),
+                    switch = (lyricsRomanization to { viewModel.setLyricsRomanization(it) }),
                 )
 
                 SettingItem(
@@ -2328,7 +2350,7 @@ fun SettingScreen(
                         if (updateChannel == DataStoreManager.FDROID) {
                             "F-Droid"
                         } else {
-                            "SimpMusic GitHub Release"
+                            "VibeFlow GitHub Release"
                         },
                     onClick = {
                         viewModel.setAlertData(
@@ -2339,7 +2361,7 @@ fun SettingScreen(
                                         listSelect =
                                             listOf(
                                                 (updateChannel == DataStoreManager.FDROID) to "F-Droid",
-                                                (updateChannel == DataStoreManager.GITHUB) to "SimpMusic GitHub Release",
+                                                (updateChannel == DataStoreManager.GITHUB) to "VibeFlow GitHub Release",
                                             ),
                                     ),
                                 confirm =
@@ -2347,7 +2369,7 @@ fun SettingScreen(
                                         viewModel.setUpdateChannel(
                                             when (state.selectOne?.getSelected()) {
                                                 "F-Droid" -> DataStoreManager.FDROID
-                                                "SimpMusic GitHub Release" -> DataStoreManager.GITHUB
+                                                "VibeFlow GitHub Release" -> DataStoreManager.GITHUB
                                                 else -> DataStoreManager.GITHUB
                                             },
                                         )

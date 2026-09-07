@@ -20,7 +20,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.maxrave.simpmusic"
+        applicationId = "com.prabincode.vibeflow"
         minSdk = 26
         targetSdk = 36
         versionCode =
@@ -33,36 +33,7 @@ android {
 
         @Suppress("UnstableApiUsage")
         androidResources {
-            localeFilters +=
-                listOf(
-                    "en",
-                    "vi",
-                    "it",
-                    "de",
-                    "ru",
-                    "tr",
-                    "fi",
-                    "pl",
-                    "pt",
-                    "fr",
-                    "es",
-                    "zh-rCN",
-                    "id",
-                    "in",
-                    "ar",
-                    "ja",
-                    "zh-rTW",
-                    "uk",
-                    "iw",
-                    "az",
-                    "hi",
-                    "th",
-                    "nl",
-                    "ko",
-                    "ca",
-                    "fa",
-                    "bg",
-                )
+            localeFilters += listOf("en")
         }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

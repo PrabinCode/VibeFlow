@@ -33,11 +33,6 @@
         <intent>
             <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
         </intent>
-    </queries>
-    <queries>
-        <package android:name="com.maxrave.simpmusic" />
-    </queries>
-    <queries>
         <intent>
             <action android:name="androidx.media3.session.MediaSessionService" />
         </intent>
@@ -147,6 +142,16 @@
                 <data android:scheme="https" />
                 <data android:host="simpmusic.org" />
                 <data android:pathPrefix="/app/" />
+            </intent-filter>
+
+            <!-- VibeFlow deep link filter (custom scheme) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="vibeflow" />
             </intent-filter>
 
             <!-- SimpMusic deep link filter (custom scheme) -->
@@ -282,6 +287,16 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/new_app_widget_info" />
+        </receiver>
+
+        <receiver android:name=".ui.widget.TurntableWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/turntable_app_widget_info" />
         </receiver>
     </application>
 

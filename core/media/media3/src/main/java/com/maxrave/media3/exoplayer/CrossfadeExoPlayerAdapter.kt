@@ -32,6 +32,8 @@ import com.maxrave.domain.repository.StreamRepository
 import com.maxrave.logger.Logger
 import com.maxrave.media3.audio.BiquadFilter
 import com.maxrave.media3.audio.CrossfadeFilterAudioProcessor
+import com.maxrave.media3.audio.EqualizerAudioProcessor
+import com.maxrave.media3.audio.EqualizerCurve
 import com.maxrave.media3.exoplayer.CrossfadeExoPlayerAdapter.Companion.SPEED_PITCH_STEP
 import com.maxrave.media3.service.mediasourcefactory.MergingMediaSourceFactory
 import kotlinx.coroutines.CancellationException
@@ -150,6 +152,9 @@ internal class CrossfadeExoPlayerAdapter(
 
     @Volatile
     private var internalSkipSilence = false
+
+    @Volatile
+    private var internalEqualizerCurve: EqualizerCurve = EqualizerCurve.FLAT
 
     // Position tracking - updated periodically, not on every query
     @Volatile
@@ -468,6 +473,7 @@ internal class CrossfadeExoPlayerAdapter(
      */
     private fun createExoPlayerInstance(): PlayerWithFilter {
         val crossfadeFilter = CrossfadeFilterAudioProcessor()
+        val equalizerAudioProcessor = EqualizerAudioProcessor { internalEqualizerCurve }
 
         val perPlayerRenderers =
             object : DefaultRenderersFactory(context) {
@@ -482,7 +488,7 @@ internal class CrossfadeExoPlayerAdapter(
                         .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                         .setAudioProcessorChain(
                             DefaultAudioSink.DefaultAudioProcessorChain(
-                                arrayOf(crossfadeFilter),
+                                arrayOf(crossfadeFilter, equalizerAudioProcessor),
                                 SilenceSkippingAudioProcessor(
                                     2_000_000,
                                     (20_000 / 2_000_000).toFloat(),
@@ -1168,6 +1174,13 @@ internal class CrossfadeExoPlayerAdapter(
             // Also apply to secondary player during crossfade
             secondaryPlayer?.skipSilenceEnabled = value
         }
+
+    override fun setEqualizer(
+        bandsDb: List<Float>,
+        preampDb: Float,
+    ) {
+        internalEqualizerCurve = EqualizerCurve(bandsDb, preampDb)
+    }
 
     // ========== Listener Management ==========
 

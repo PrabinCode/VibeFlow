@@ -86,7 +86,9 @@ import coil3.request.crossfade
 import com.maxrave.common.Config
 import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.data.model.browse.album.Track
+import com.maxrave.domain.data.model.intent.GenericIntent
 import com.maxrave.domain.data.model.searchResult.albums.AlbumsResult
+import com.maxrave.simpmusic.extension.toAppDeepLinkOrNull
 import com.maxrave.domain.data.model.searchResult.artists.ArtistsResult
 import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
 import com.maxrave.domain.data.model.searchResult.songs.SongsResult
@@ -908,7 +910,11 @@ fun SearchScreen(
                         searchText = newText
                     },
                     onSearch = { query ->
-                        if (query.isNotEmpty()) {
+                        val deepLink = query.toAppDeepLinkOrNull()
+                        if (deepLink != null) {
+                            focusManager.clearFocus()
+                            sharedViewModel.setIntent(GenericIntent(data = deepLink))
+                        } else if (query.isNotEmpty()) {
                             isSearchSubmitted = true
                             focusManager.clearFocus()
                             searchViewModel.insertSearchHistory(query)

@@ -63,7 +63,7 @@ fun ReviewDialog(
         },
         title = {
             Text(
-                stringResource(Res.string.enjoying_simpmusic),
+                stringResource(Res.string.enjoying_vibeflow),
                 style = typo().labelSmall,
             )
         },

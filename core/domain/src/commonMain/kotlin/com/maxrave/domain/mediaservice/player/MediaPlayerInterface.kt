@@ -98,6 +98,11 @@ interface MediaPlayerInterface {
     var volume: Float
     var skipSilenceEnabled: Boolean
 
+    fun setEqualizer(
+        bandsDb: List<Float>,
+        preampDb: Float,
+    ) {}
+
     // Listener management
     fun addListener(listener: MediaPlayerListener)
 

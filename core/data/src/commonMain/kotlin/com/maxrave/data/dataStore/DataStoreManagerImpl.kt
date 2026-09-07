@@ -559,6 +559,72 @@ internal class DataStoreManagerImpl(
         }
     }
 
+    override val equalizerEnabled: Flow<String> =
+        settingsDataStore.data.map { preferences ->
+            preferences[EQUALIZER_ENABLED] ?: FALSE
+        }
+
+    override suspend fun setEqualizerEnabled(enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            settingsDataStore.edit { settings ->
+                settings[EQUALIZER_ENABLED] = if (enabled) TRUE else FALSE
+            }
+        }
+    }
+
+    override val equalizerBands: Flow<String> =
+        settingsDataStore.data.map { preferences ->
+            preferences[EQUALIZER_BANDS] ?: ""
+        }
+
+    override suspend fun setEqualizerBands(bandsDb: List<Float>) {
+        withContext(Dispatchers.IO) {
+            settingsDataStore.edit { settings ->
+                settings[EQUALIZER_BANDS] =
+                    if (bandsDb.all { it == 0f }) "" else bandsDb.joinToString(",")
+            }
+        }
+    }
+
+    override val equalizerPreamp: Flow<Float> =
+        settingsDataStore.data.map { preferences ->
+            preferences[EQUALIZER_PREAMP]?.toFloatOrNull() ?: 0f
+        }
+
+    override suspend fun setEqualizerPreamp(preampDb: Float) {
+        withContext(Dispatchers.IO) {
+            settingsDataStore.edit { settings ->
+                settings[EQUALIZER_PREAMP] = preampDb.toString()
+            }
+        }
+    }
+
+    override val equalizerAutoEqProfile: Flow<String> =
+        settingsDataStore.data.map { preferences ->
+            preferences[EQUALIZER_AUTOEQ_PROFILE] ?: ""
+        }
+
+    override suspend fun setEqualizerAutoEqProfile(name: String) {
+        withContext(Dispatchers.IO) {
+            settingsDataStore.edit { settings ->
+                settings[EQUALIZER_AUTOEQ_PROFILE] = name
+            }
+        }
+    }
+
+    override val lyricsRomanization: Flow<String> =
+        settingsDataStore.data.map { preferences ->
+            preferences[LYRICS_ROMANIZATION] ?: DataStoreManager.TRUE
+        }
+
+    override suspend fun setLyricsRomanization(enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            settingsDataStore.edit { settings ->
+                settings[LYRICS_ROMANIZATION] = if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE
+            }
+        }
+    }
+
     override val videoQuality =
         settingsDataStore.data.map { preferences ->
             preferences[VIDEO_QUALITY] ?: "720p"
@@ -1627,6 +1693,13 @@ internal class DataStoreManagerImpl(
         val AUTO_BACKUP_FREQUENCY = stringPreferencesKey("auto_backup_frequency")
         val AUTO_BACKUP_MAX_FILES = intPreferencesKey("auto_backup_max_files")
         val AUTO_BACKUP_LAST_TIME = longPreferencesKey("auto_backup_last_time")
+
+        // Equalizer
+        val EQUALIZER_ENABLED = stringPreferencesKey("equalizer_enabled")
+        val EQUALIZER_BANDS = stringPreferencesKey("equalizer_bands")
+        val EQUALIZER_PREAMP = stringPreferencesKey("equalizer_preamp")
+        val EQUALIZER_AUTOEQ_PROFILE = stringPreferencesKey("equalizer_autoeq_profile")
+        val LYRICS_ROMANIZATION = stringPreferencesKey("lyrics_romanization")
     }
 }
 
