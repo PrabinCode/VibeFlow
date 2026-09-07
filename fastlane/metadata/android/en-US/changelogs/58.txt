@@ -1,0 +1,7 @@
+- VibeFlow 2.0.0 Major Release
+- 10-Band Equalizer & AutoEq with 40+ headphone profiles
+- Multilingual Lyrics Romanization (Devanagari, Korean, Japanese, Cyrillic, etc.)
+- Android Home Screen Widgets (Glance & Vinyl Turntable)
+- Regional Content Localization: Nepal (Priority 1), India (Priority 2), US/Global (Priority 3)
+- Country name, code, and flag emoji picker in Settings
+- Performance optimizations and package branding

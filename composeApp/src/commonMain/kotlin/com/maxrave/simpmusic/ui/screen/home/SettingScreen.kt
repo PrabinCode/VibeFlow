@@ -765,9 +765,9 @@ fun SettingScreen(
                 )
                 SettingItem(
                     title = stringResource(Res.string.content_country),
-                    subtitle = SUPPORTED_LOCATION.getDisplayName(location ?: "US"),
+                    subtitle = SUPPORTED_LOCATION.getDisplayName(location ?: "NP"),
                     onClick = {
-                        val currentLoc = location ?: "US"
+                        val currentLoc = location ?: "NP"
                         viewModel.setAlertData(
                             SettingAlertState(
                                 title = runBlocking { getString(Res.string.content_country) },
@@ -782,7 +782,7 @@ fun SettingScreen(
                                     runBlocking { getString(Res.string.change) } to { state ->
                                         val selected = state.selectOne?.getSelected() ?: ""
                                         val code =
-                                            SUPPORTED_LOCATION.getCodeFromDisplayName(selected).ifEmpty { "US" }
+                                            SUPPORTED_LOCATION.getCodeFromDisplayName(selected).ifEmpty { "NP" }
                                         viewModel.changeLocation(code)
                                     },
                                 dismiss = runBlocking { getString(Res.string.cancel) },

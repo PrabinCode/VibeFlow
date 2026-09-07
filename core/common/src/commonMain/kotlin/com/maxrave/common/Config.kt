@@ -300,10 +300,17 @@ object SUPPORTED_LOCATION {
     }
 
     val displayList: List<Pair<String, String>> by lazy {
-        items.map { item ->
+        val priorityCodes = listOf("NP", "IN", "US")
+        val priorityList = priorityCodes.mapNotNull { code ->
+            if (items.contains(code)) {
+                code to getDisplayName(code)
+            } else null
+        }
+        val remaining = items.filterNot { priorityCodes.contains(it) }.map { item ->
             val code = item.toString()
             code to getDisplayName(code)
         }.sortedBy { it.second.substringAfter(" ") }
+        priorityList + remaining
     }
 }
 
@@ -449,8 +456,9 @@ sealed class SponsorBlockType(
 object CHART_SUPPORTED_COUNTRY {
     val items =
         arrayOf(
-            "US",
+            "IN",
             "ZZ",
+            "US",
             "AR",
             "AU",
             "AT",
@@ -476,7 +484,6 @@ object CHART_SUPPORTED_COUNTRY {
             "HK",
             "HU",
             "IS",
-            "IN",
             "ID",
             "IE",
             "IL",
@@ -521,8 +528,9 @@ object CHART_SUPPORTED_COUNTRY {
         )
     val itemsData =
         arrayOf(
-            "United States",
+            "India",
             "Global",
+            "United States",
             "Argentina",
             "Australia",
             "Austria",
@@ -548,7 +556,6 @@ object CHART_SUPPORTED_COUNTRY {
             "Hong Kong",
             "Hungary",
             "Iceland",
-            "India",
             "Indonesia",
             "Ireland",
             "Israel",

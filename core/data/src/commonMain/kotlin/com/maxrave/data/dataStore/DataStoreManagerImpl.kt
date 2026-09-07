@@ -80,7 +80,12 @@ internal class DataStoreManagerImpl(
 
     override val location: Flow<String> =
         settingsDataStore.data.map { preferences ->
-            preferences[LOCATION] ?: "VN"
+            val loc = preferences[LOCATION]
+            if (loc.isNullOrBlank() || loc == "VN") {
+                "NP"
+            } else {
+                loc
+            }
         }
 
     override suspend fun setLocation(location: String) {
@@ -785,7 +790,12 @@ internal class DataStoreManagerImpl(
 
     override val chartKey =
         settingsDataStore.data.map { preferences ->
-            preferences[CHART_KEY] ?: "ZZ"
+            val key = preferences[CHART_KEY]
+            if (key.isNullOrBlank() || key == "VN") {
+                "IN"
+            } else {
+                key
+            }
         }
 
     override suspend fun setChartKey(key: String) {

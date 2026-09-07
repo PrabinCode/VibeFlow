@@ -5,6 +5,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import com.eygraber.uri.Uri
+import com.maxrave.common.CHART_SUPPORTED_COUNTRY
 import com.maxrave.common.Config
 import com.maxrave.common.QUALITY
 import com.maxrave.common.SELECTED_LANGUAGE
@@ -1128,6 +1129,11 @@ class SettingsViewModel(
     fun changeLocation(location: String) {
         viewModelScope.launch {
             dataStoreManager.setLocation(location)
+            if (location == "NP" || location == "IN") {
+                dataStoreManager.setChartKey("IN")
+            } else if (CHART_SUPPORTED_COUNTRY.items.contains(location)) {
+                dataStoreManager.setChartKey(location)
+            }
             getLocation()
         }
     }
