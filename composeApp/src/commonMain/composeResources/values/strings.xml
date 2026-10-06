@@ -675,4 +675,20 @@
     <string name="player_style_classic">Classic Style</string>
     <string name="lyrics_romanization">Lyrics Romanization</string>
     <string name="lyrics_romanization_description">Phonetic transliteration for Japanese, Korean, Chinese, Hindi, Cyrillic, and more</string>
+    <string name="lyrics_offset_message">Shift every lyric line by this many milliseconds. Use a positive number when you hear the audio later than you see it, which is what Bluetooth headphones do, and a negative number to make the lyrics appear earlier.</string>
+    <string name="lyrics_offset_value">%1$s ms</string>
+    <string name="lyrics_offset_invalid">Enter a whole number of milliseconds</string>
+    <string name="share_lyrics_select_title">Select lines</string>
+    <string name="share_lyrics_selected_count">%1$d lines selected</string>
+    <string name="share_lyrics_continue">Continue</string>
+    <string name="share_lyrics_max_reached">You can share up to %1$d lines</string>
+    <string name="share_lyrics_save">Save image</string>
+    <string name="share_lyrics_share_action">Share</string>
+    <string name="share_lyrics_saved">Saved to your photos</string>
+    <string name="share_lyrics_saved_desktop">Saved to your downloads folder</string>
+    <string name="share_lyrics_save_failed">Could not save the image</string>
+    <string name="share_lyrics_share_failed">Could not share the image</string>
+    <string name="share_lyrics_background">Background</string>
+    <string name="share_lyrics_permission_denied">Storage permission is needed to save the image</string>
+    <string name="share_lyrics_no_lyrics">This song has no lyrics to share</string>
 </resources>

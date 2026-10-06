@@ -169,6 +169,22 @@ class SharedViewModel(
 
     val castState: StateFlow<GenericCastState> get() = mediaPlayerHandler.castState
 
+    // One-shot: the Desktop capsule asks the Now Playing panel, which hosts the page, to open
+    // full-screen lyrics. The panel consumes it once shown.
+    private val _fullscreenLyricsRequest = MutableStateFlow(false)
+    val fullscreenLyricsRequest: StateFlow<Boolean> = _fullscreenLyricsRequest
+
+    fun requestFullscreenLyrics() {
+        _fullscreenLyricsRequest.value = true
+    }
+
+    fun consumeFullscreenLyricsRequest() {
+        _fullscreenLyricsRequest.value = false
+    }
+
+    fun getLyricsStyle() = dataStoreManager.lyricsStyle
+    fun getLyricsOffsetMs() = dataStoreManager.lyricsOffset
+
     private var _controllerState =
         MutableStateFlow<ControlState>(
             ControlState(

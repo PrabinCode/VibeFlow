@@ -380,6 +380,10 @@ fun App(viewModel: SharedViewModel = koinInject()) {
                                         viewModel.stopPlayer()
                                         viewModel.isServiceRunning = false
                                     },
+                                    onOpenFullscreenLyrics = {
+                                        viewModel.requestFullscreenLyrics()
+                                        isShowNowPlaylistScreen = true
+                                    },
                                 )
                             }
                             if (isLiquidGlassEnabled == TRUE) {
@@ -494,6 +498,10 @@ fun App(viewModel: SharedViewModel = koinInject()) {
                                     onClose = {
                                         viewModel.stopPlayer()
                                         viewModel.isServiceRunning = false
+                                    },
+                                    onOpenFullscreenLyrics = {
+                                        viewModel.requestFullscreenLyrics()
+                                        isShowNowPlaylistScreen = true
                                     },
                                 )
                             }

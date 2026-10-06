@@ -220,7 +220,7 @@ private val WHITESPACE_REGEX = Regex("""\s+""")
 
 // Word-by-word lyrics carry a timestamp per word; replace each with a space
 // (not ""), then collapse — otherwise the words run together.
-private fun String.stripRichSyncTimestamps(): String =
+internal fun String.stripRichSyncTimestamps(): String =
     replace(RICH_SYNC_TIMESTAMP_REGEX, " ")
         .replace(WHITESPACE_REGEX, " ")
         .trim()
@@ -428,6 +428,13 @@ fun NowPlayingScreenContent(
 
     var showFullscreenLyrics by rememberSaveable {
         mutableStateOf(false)
+    }
+    val fullscreenLyricsRequested by sharedViewModel.fullscreenLyricsRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(fullscreenLyricsRequested) {
+        if (fullscreenLyricsRequested) {
+            showFullscreenLyrics = true
+            sharedViewModel.consumeFullscreenLyricsRequest()
+        }
     }
 
     var showQueueBottomSheet by rememberSaveable {

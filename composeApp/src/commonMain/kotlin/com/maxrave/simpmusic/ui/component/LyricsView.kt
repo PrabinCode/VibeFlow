@@ -125,12 +125,68 @@ import simpmusic.composeapp.generated.resources.select_lyrics_to_share
 import simpmusic.composeapp.generated.resources.share_lyrics
 import simpmusic.composeapp.generated.resources.share_quote_card
 import simpmusic.composeapp.generated.resources.unavailable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameNanos
+import com.maxrave.simpmusic.ui.component.lyrics.ShareLyricsSheet
+import com.maxrave.simpmusic.ui.component.lyrics.toShareLyricsLines
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 private const val TAG = "LyricsView"
+
+// The interval the player publishes its position on
+private const val PLAYHEAD_TICK_MS = 50L
+
+// A rich-synced line followed by a silence at least this long gets a row of dots
+private const val INTERLUDE_MIN_GAP_MS = 3_000L
+
+private const val INTERLUDE_DOT_COUNT = 3
+private const val INTERLUDE_DOT = "\u2022"
+
+private const val EMP_AMOUNT_REF_MS = 2000f
+private const val EMP_BLUR_REF_MS = 3000f
+private const val EMP_MIN_DURATION_MS = 1000f
+private const val EMP_AMOUNT_GAIN = 0.6f
+private const val EMP_BLUR_GAIN = 0.5f
+private const val EMP_AMOUNT_CAP = 1.2f
+private const val EMP_BLUR_CAP = 0.8f
+private const val EMP_LAST_WORD_AMOUNT = 1.6f
+private const val EMP_LAST_WORD_BLUR = 1.5f
+private const val EMP_SCALE_EM = 0.1f
+private const val EMP_RISE_EM = 0.025f
+private const val EMP_GLOW_RADIUS_EM = 0.3f
+
+private const val FLARE_REACH_CHARS = 3.5f
+private const val FLARE_FADE_MS = 2_500
+private const val FLARE_ATTACK_MS = 500
+private const val FLARE_TAIL_CHARS = 2.5f
+private const val CHAR_RISE_EM = 0.065f
+private const val CHAR_RISE_MS = 1_000
+
+private const val SUNG_BASE_GLOW_ALPHA = 0.95f
+private const val SUNG_BASE_GLOW_EM = 0.26f
+
+private val EmpBezIn = CubicBezierEasing(0.2f, 0.4f, 0.58f, 1f)
+private val EmpBezOut = CubicBezierEasing(0.3f, 0f, 0.58f, 1f)
+
+private fun empEasing(x: Float): Float =
+    if (x < 0.5f) {
+        EmpBezIn.transform((x / 0.5f).coerceIn(0f, 1f))
+    } else {
+        1f - EmpBezOut.transform(((x - 0.5f) / 0.5f).coerceIn(0f, 1f))
+    }
 
 // Minimum wipe animation duration. Words shorter than this still wipe over MIN_WIPE_MS so the
 // motion stays perceivable; the snap-to-1f on isPast catches up at the actual word end.
@@ -141,6 +197,90 @@ private const val MIN_WIPE_MS = 150
 private val DimOriginalColor = Color.LightGray.copy(alpha = 0.35f)
 private val DimTranslatedColor = Color(0xFF97971A).copy(alpha = 0.3f)
 private val DimRichPendingColor = Color.LightGray.copy(alpha = 0.6f)
+
+private data class DisplayLines(
+    val lines: List<com.maxrave.domain.data.model.metadata.Line>,
+    val interludeIndices: Set<Int>,
+)
+
+private fun buildDisplayLines(
+    lines: List<com.maxrave.domain.data.model.metadata.Line>?,
+    syncType: String?,
+): DisplayLines {
+    val source = lines.orEmpty()
+    if (syncType != "RICH_SYNCED" || source.size < 2) return DisplayLines(source, emptySet())
+
+    val out = ArrayList<com.maxrave.domain.data.model.metadata.Line>(source.size)
+    val inserted = mutableSetOf<Int>()
+    source.forEachIndexed { index, line ->
+        out += line
+        val nextStartMs = source.getOrNull(index + 1)?.startTimeMs?.toLongOrNull() ?: return@forEachIndexed
+        val lastWordStartMs =
+            parseRichSyncWords(line.words, line.startTimeMs, line.endTimeMs)
+                ?.words
+                ?.lastOrNull()
+                ?.startTimeMs
+                ?: return@forEachIndexed
+        val dotsStartMs = lastWordStartMs + INTERLUDE_MIN_GAP_MS
+        if (nextStartMs <= dotsStartMs) return@forEachIndexed
+        val interlude = interludeLine(dotsStartMs, nextStartMs) ?: return@forEachIndexed
+        inserted += out.size
+        out += interlude
+    }
+    return DisplayLines(out, inserted)
+}
+
+private fun interludeLine(
+    startMs: Long,
+    endMs: Long,
+): com.maxrave.domain.data.model.metadata.Line? {
+    val stepMs = (endMs - startMs) / INTERLUDE_DOT_COUNT
+    val words =
+        buildString {
+            repeat(INTERLUDE_DOT_COUNT) { dot ->
+                append(richSyncTimestamp(startMs + stepMs * dot) ?: return null)
+                append(INTERLUDE_DOT)
+            }
+        }
+    return com.maxrave.domain.data.model.metadata.Line(
+        startTimeMs = startMs.toString(),
+        endTimeMs = endMs.toString(),
+        syllables = null,
+        words = words,
+    )
+}
+
+private fun richSyncTimestamp(ms: Long): String? {
+    val centis = ms / 10
+    val minutes = centis / 6000
+    if (minutes > 99) return null
+    return "<${twoDigits(minutes)}:${twoDigits((centis / 100) % 60)}.${twoDigits(centis % 100)}>"
+}
+
+private fun twoDigits(value: Long): String = if (value < 10) "0$value" else value.toString()
+
+@Composable
+private fun rememberSmoothPlayhead(
+    rawMs: Long,
+    enabled: Boolean,
+): State<Long> {
+    val playhead = remember { mutableLongStateOf(rawMs) }
+    LaunchedEffect(rawMs, enabled) {
+        if (!enabled) {
+            playhead.longValue = rawMs
+            return@LaunchedEffect
+        }
+        var baseNanos = -1L
+        while (true) {
+            withFrameNanos { frameNanos ->
+                if (baseNanos < 0L) baseNanos = frameNanos
+                val elapsedMs = (frameNanos - baseNanos) / 1_000_000L
+                playhead.longValue = rawMs + elapsedMs.coerceIn(0L, PLAYHEAD_TICK_MS)
+            }
+        }
+    }
+    return playhead
+}
 
 private data class TimedLineIndex(
     val index: Int,
@@ -265,13 +405,23 @@ fun LyricsView(
     val lyricsOffset by dataStoreManager.lyricsOffset.collectAsStateWithLifecycle(0L)
     val lyricsRomanization by dataStoreManager.lyricsRomanization.collectAsStateWithLifecycle(DataStoreManager.TRUE)
 
+    val displayLines =
+        remember(lyricsData.lyrics.lines, lyricsData.lyrics.syncType) {
+            buildDisplayLines(lyricsData.lyrics.lines, lyricsData.lyrics.syncType)
+        }
+
     val timedLineIndexes =
-        remember(lyricsData.lyrics.lines) {
-            lyricsData.lyrics.lines
-                .orEmpty()
-                .mapIndexedNotNull { index, line ->
-                    line.startTimeMs.toLongOrNull()?.let { TimedLineIndex(index, it) }
-                }.sortedBy { it.startTimeMs }
+        remember(displayLines) {
+            val timed =
+                displayLines.lines
+                    .mapIndexedNotNull { index, line ->
+                        line.startTimeMs.toLongOrNull()?.let { TimedLineIndex(index, it) }
+                    }
+            if (timed.distinctBy { it.startTimeMs }.size <= 1) {
+                emptyList()
+            } else {
+                timed.sortedBy { it.startTimeMs }
+            }
         }
 
     val currentLineIndex by remember(timedLineIndexes, lyricsOffset) {
@@ -283,11 +433,11 @@ fun LyricsView(
 
     val syncedTranslatedWordsByLineIndex =
         remember(
-            lyricsData.lyrics.lines,
+            displayLines,
             lyricsData.translatedLyrics?.first?.lines,
         ) {
             buildSyncedTranslatedWordsByLineIndex(
-                originalLines = lyricsData.lyrics.lines.orEmpty(),
+                originalLines = displayLines.lines,
                 translatedLines = lyricsData.translatedLyrics?.first?.lines.orEmpty(),
                 thresholdMs = 1000L,
             )
@@ -305,29 +455,37 @@ fun LyricsView(
             state = listState,
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(lyricsData.lyrics.lines?.size ?: 0) { index ->
-                val line = lyricsData.lyrics.lines?.getOrNull(index)
+            items(displayLines.lines.size) { index ->
+                val line = displayLines.lines.getOrNull(index)
                 val isSelected = index in selectedLineIndexes
+                val isInterlude = index in displayLines.interludeIndices
                 // Translated lyrics: synced -> precomputed map by line index, unsynced -> by index.
                 val translatedWords =
-                    if (lyricsData.lyrics.syncType == "LINE_SYNCED" || lyricsData.lyrics.syncType == "RICH_SYNCED") {
-                        syncedTranslatedWordsByLineIndex[index]
-                    } else {
-                        lyricsData.translatedLyrics
-                            ?.first
-                            ?.lines
-                            ?.getOrNull(index)
-                            ?.words
+                    when {
+                        isInterlude -> null
+                        lyricsData.lyrics.syncType == "LINE_SYNCED" || lyricsData.lyrics.syncType == "RICH_SYNCED" ->
+                            syncedTranslatedWordsByLineIndex[index]
+                        else ->
+                            lyricsData.translatedLyrics
+                                ?.first
+                                ?.lines
+                                ?.getOrNull(index)
+                                ?.words
                     }
 
                 line?.words?.let { words ->
-                    val romanizedWords = remember(words, lyricsRomanization) {
-                        if (lyricsRomanization == DataStoreManager.TRUE) {
-                            LyricsRomanizationEngine.romanize(words)
-                        } else {
+                    val romanizedWords =
+                        if (isInterlude) {
                             null
+                        } else {
+                            remember(words, lyricsRomanization) {
+                                if (lyricsRomanization == DataStoreManager.TRUE) {
+                                    LyricsRomanizationEngine.romanize(words)
+                                } else {
+                                    null
+                                }
+                            }
                         }
-                    }
 
                     val clickAction: () -> Unit = {
                         if (isShareMode) {
@@ -485,12 +643,15 @@ fun RichSyncLyricsLineItem(
     isSelected: Boolean = false,
     customFontSize: TextUnit? = null,
     customPadding: Dp = 12.dp,
+    glow: Shadow? = null,
     modifier: Modifier = Modifier,
 ) {
-    val currentWordIndex by remember(currentTimeMs, parsedLine.words) {
+    val playhead = rememberSmoothPlayhead(currentTimeMs, enabled = isCurrent)
+
+    val currentWordIndex by remember(parsedLine.words, isCurrent) {
         derivedStateOf {
             if (!isCurrent) return@derivedStateOf -1
-            parsedLine.words.indexOfLast { it.startTimeMs <= currentTimeMs }
+            parsedLine.words.indexOfLast { it.startTimeMs <= playhead.value }
         }
     }
 
@@ -511,62 +672,65 @@ fun RichSyncLyricsLineItem(
         ) {
             Spacer(modifier = Modifier.height(customPadding))
 
-        // Original lyrics with rich sync highlighting - using FlowRow for word wrapping
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            parsedLine.words.forEachIndexed { index, wordTiming ->
-                // Calculate word end time (start time of next word or line end time)
-                // If last word and lineEndTimeMs is invalid (Long.MAX_VALUE), estimate based on previous word duration
-                val wordEndTimeMs =
-                    if (index < parsedLine.words.size - 1) {
-                        parsedLine.words[index + 1].startTimeMs
-                    } else if (parsedLine.lineEndTimeMs == Long.MAX_VALUE || parsedLine.lineEndTimeMs <= wordTiming.startTimeMs) {
-                        // Estimate: use previous word duration or default 500ms
-                        if (index > 0 && parsedLine.words[index - 1].startTimeMs < wordTiming.startTimeMs) {
-                            val prevWordDuration = wordTiming.startTimeMs - parsedLine.words[index - 1].startTimeMs
-                            wordTiming.startTimeMs + prevWordDuration
+            // Original lyrics with rich sync highlighting - using FlowRow for word wrapping
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                parsedLine.words.forEachIndexed { index, wordTiming ->
+                    // Calculate word end time (start time of next word or line end time)
+                    // If last word and lineEndTimeMs is invalid (Long.MAX_VALUE), estimate based on previous word duration
+                    val wordEndTimeMs =
+                        if (index < parsedLine.words.size - 1) {
+                            parsedLine.words[index + 1].startTimeMs
+                        } else if (parsedLine.lineEndTimeMs == Long.MAX_VALUE || parsedLine.lineEndTimeMs <= wordTiming.startTimeMs) {
+                            // Estimate: use previous word duration or default 500ms
+                            if (index > 0 && parsedLine.words[index - 1].startTimeMs < wordTiming.startTimeMs) {
+                                val prevWordDuration = wordTiming.startTimeMs - parsedLine.words[index - 1].startTimeMs
+                                wordTiming.startTimeMs + prevWordDuration
+                            } else {
+                                wordTiming.startTimeMs + 500L // Default 500ms if no reference
+                            }
                         } else {
-                            wordTiming.startTimeMs + 500L // Default 500ms if no reference
+                            parsedLine.lineEndTimeMs
                         }
-                    } else {
-                        parsedLine.lineEndTimeMs
-                    }
-                AnimatedWord(
-                    word = wordTiming.text,
-                    wordIndex = index,
-                    wordStartTimeMs = wordTiming.startTimeMs,
-                    wordEndTimeMs = wordEndTimeMs,
-                    currentTimeMs = currentTimeMs,
-                    isActive = isCurrent && index == currentWordIndex,
-                    isPast = isCurrent && index < currentWordIndex,
-                    isCurrent = isCurrent,
-                    customFontSize = customFontSize,
+                    AnimatedWord(
+                        word = wordTiming.text,
+                        wordIndex = index,
+                        wordStartTimeMs = wordTiming.startTimeMs,
+                        wordEndTimeMs = wordEndTimeMs,
+                        currentTimeMs = currentTimeMs,
+                        playheadMs = playhead,
+                        isActive = isCurrent && index == currentWordIndex,
+                        isPast = isCurrent && index < currentWordIndex,
+                        isCurrent = isCurrent,
+                        customFontSize = customFontSize,
+                        glow = glow,
+                        isLastWord = index == parsedLine.words.lastIndex,
+                    )
+                }
+            }
+
+            if (romanizedWords != null) {
+                Text(
+                    text = romanizedWords,
+                    style = typo().titleSmall,
+                    color = if (isCurrent) Color(0xFF81D4FA) else DimOriginalColor.copy(alpha = 0.6f),
                 )
             }
-        }
 
-        if (romanizedWords != null) {
-            Text(
-                text = romanizedWords,
-                style = typo().titleSmall,
-                color = if (isCurrent) Color(0xFF81D4FA) else DimOriginalColor.copy(alpha = 0.6f),
-            )
-        }
+            // Translated lyrics (line-level, no word sync)
+            if (translatedWords != null) {
+                Text(
+                    text = translatedWords,
+                    style = typo().bodyMedium,
+                    color = if (isCurrent) Color.Yellow else DimTranslatedColor,
+                )
+            }
 
-        // Translated lyrics (line-level, no word sync)
-        if (translatedWords != null) {
-            Text(
-                text = translatedWords,
-                style = typo().bodyMedium,
-                color = if (isCurrent) Color.Yellow else DimTranslatedColor,
-            )
+            Spacer(modifier = Modifier.height(customPadding))
         }
-
-        Spacer(modifier = Modifier.height(customPadding))
     }
-}
 }
 
 @Composable
@@ -576,10 +740,14 @@ private fun AnimatedWord(
     wordStartTimeMs: Long,
     wordEndTimeMs: Long,
     currentTimeMs: Long,
+    playheadMs: State<Long>,
     isActive: Boolean,
     isPast: Boolean,
     isCurrent: Boolean,
     customFontSize: TextUnit? = null,
+    glow: Shadow? = null,
+    isLastWord: Boolean = false,
+    pendingColorOverride: Color? = null,
 ) {
     val style =
         typo().headlineLarge.copy(
@@ -587,20 +755,15 @@ private fun AnimatedWord(
         )
 
     if (!isCurrent) {
-        Text(text = word, style = style, color = DimOriginalColor)
+        Text(text = word, style = style, color = pendingColorOverride ?: DimOriginalColor)
         return
     }
 
-    // Wall-clock wipe driven by an Animatable.
-    // - Future word (not active, not past): progress stays at 0.
-    // - Active word: snap to current % then animateTo(1f) over the remaining duration of the
-    //   word, in real wall-clock time. Independent of timeline emit rate, so wipe is smooth.
-    // - Past word: snap to 1f.
-    val wordDurationMs = (wordEndTimeMs - wordStartTimeMs).coerceAtLeast(100L)
+    val wordDurationMs = (wordEndTimeMs - wordStartTimeMs).coerceAtLeast(1L)
     val anim =
         remember(wordStartTimeMs, wordEndTimeMs) {
             val initial =
-                ((currentTimeMs - wordStartTimeMs).toFloat() / wordDurationMs.toFloat())
+                ((playheadMs.value - wordStartTimeMs).toFloat() / wordDurationMs.toFloat())
                     .coerceIn(0f, 1f)
             androidx.compose.animation.core.Animatable(initial)
         }
@@ -609,41 +772,136 @@ private fun AnimatedWord(
         when {
             isPast -> anim.snapTo(1f)
             isActive -> {
-                val now = currentTimeMs
+                val now = playheadMs.value
                 val current =
                     ((now - wordStartTimeMs).toFloat() / wordDurationMs.toFloat())
                         .coerceIn(0f, 1f)
                 anim.snapTo(current)
-                // Ensure minimum visible wipe duration so very short words don't flash.
-                // Tradeoff: visual may finish ~MIN_WIPE_MS after the actual word end, but the
-                // next isPast=true transition will snap to 1f so it stays consistent.
-                val remainingMs =
-                    (wordEndTimeMs - now).coerceAtLeast(0L).toInt().coerceAtLeast(MIN_WIPE_MS)
+                val remainingMs = (wordEndTimeMs - now).coerceAtLeast(0L).toInt().coerceAtLeast(1)
                 anim.animateTo(1f, tween(remainingMs, easing = LinearEasing))
             }
-            // Future word (not active, not past): keep current value.
-            // Don't snap to 0 — playback position can jitter backwards by a few ms,
-            // briefly flipping isActive false. Snapping would jerk the wipe back.
         }
     }
 
     val progress = anim.value
+    val wordProgress =
+        when {
+            isPast -> 1f
+            isActive -> progress
+            else -> 0f
+        }
 
-    Box {
-        // Bottom layer: dimmed pending color, drawn for the whole word.
-        Text(text = word, style = style, color = DimRichPendingColor)
-        // Top layer: white, clipped horizontally so only the wiped portion shows.
-        Text(
-            text = word,
-            style = style,
-            color = Color.White,
-            modifier =
-                Modifier.drawWithContent {
-                    clipRect(right = size.width * progress) {
-                        this@drawWithContent.drawContent()
+    val emphasisDurationMs = max(EMP_MIN_DURATION_MS, wordDurationMs.toFloat())
+    val amount =
+        if (glow == null) {
+            0f
+        } else {
+            val raw = emphasisDurationMs / EMP_AMOUNT_REF_MS
+            val shaped = if (raw > 1f) sqrt(raw) else raw * raw * raw
+            min(EMP_AMOUNT_CAP, shaped * EMP_AMOUNT_GAIN * if (isLastWord) EMP_LAST_WORD_AMOUNT else 1f)
+        }
+    val blurAmount =
+        if (glow == null) {
+            0f
+        } else {
+            val raw = emphasisDurationMs / EMP_BLUR_REF_MS
+            val shaped = if (raw > 1f) sqrt(raw) else raw * raw * raw
+            min(EMP_BLUR_CAP, shaped * EMP_BLUR_GAIN * if (isLastWord) EMP_LAST_WORD_BLUR else 1f)
+        }
+    val flareGate by animateFloatAsState(
+        targetValue = if (isActive) 1f else 0f,
+        animationSpec =
+            tween(
+                durationMillis = if (isActive) FLARE_ATTACK_MS else FLARE_FADE_MS,
+                easing = LinearEasing,
+            ),
+        label = "flareGate",
+    )
+
+    val eased = if (amount <= 0f && blurAmount <= 0f) 0f else empEasing(wordProgress)
+    val fontPx = with(LocalDensity.current) { style.fontSize.toPx() }
+    val heldGlow =
+        if (eased * blurAmount <= 0.01f) {
+            null
+        } else {
+            glow?.copy(
+                color = glow.color.copy(alpha = (eased * blurAmount).coerceIn(0f, 1f)),
+                blurRadius = min(EMP_GLOW_RADIUS_EM, blurAmount * EMP_GLOW_RADIUS_EM) * fontPx,
+            )
+        }
+
+    Box(
+        modifier =
+            Modifier.graphicsLayer {
+                val scale = 1f + eased * EMP_SCALE_EM * amount
+                scaleX = scale
+                scaleY = scale
+                translationY = -eased * EMP_RISE_EM * amount * fontPx
+            },
+    ) {
+        val chars = word.toCharArray()
+        val charCount = chars.size.coerceAtLeast(1)
+        Row {
+            chars.forEachIndexed { charIndex, ch ->
+                val charFrom = charIndex.toFloat() / charCount
+                val charTo = (charIndex + 1).toFloat() / charCount
+                val charProgress = ((wordProgress - charFrom) / (charTo - charFrom)).coerceIn(0f, 1f)
+                val charPast = wordProgress >= charTo
+                val charActive = isActive && wordProgress >= charFrom && wordProgress < charTo
+                val charCenter = (charFrom + charTo) / 2f
+                val reach = (FLARE_REACH_CHARS / charCount).coerceAtLeast(0.0001f)
+                val charFlare =
+                    if (flareGate <= 0f || glow == null) {
+                        0f
+                    } else {
+                        val delta = wordProgress - charCenter
+                        val shape =
+                            if (delta > 0f) {
+                                exp(-delta / (FLARE_TAIL_CHARS / charCount))
+                            } else {
+                                (1f - abs(delta) / reach).coerceIn(0f, 1f)
+                            }
+                        shape * flareGate
                     }
-                },
-        )
+                val charRise by animateFloatAsState(
+                    targetValue = if (glow != null && charProgress > 0f) 1f else 0f,
+                    animationSpec = tween(CHAR_RISE_MS, easing = FastOutSlowInEasing),
+                    label = "charRise",
+                )
+                val restingColor = pendingColorOverride ?: DimRichPendingColor
+                Box(
+                    modifier =
+                        Modifier.graphicsLayer {
+                            translationY = -charRise * CHAR_RISE_EM * fontPx
+                        },
+                ) {
+                    val glowShadow = heldGlow ?: glow?.copy(blurRadius = SUNG_BASE_GLOW_EM * fontPx)
+                    if (glowShadow != null) {
+                        Text(
+                            text = ch.toString(),
+                            style =
+                                style.copy(
+                                    shadow =
+                                        glowShadow.copy(
+                                            color = glowShadow.color.copy(alpha = SUNG_BASE_GLOW_ALPHA * charFlare),
+                                        ),
+                                ),
+                            color = Color.Transparent,
+                        )
+                    }
+                    Text(
+                        text = ch.toString(),
+                        style = style,
+                        color =
+                            when {
+                                charPast -> Color.White
+                                charActive -> lerp(restingColor, Color.White, charProgress)
+                                else -> restingColor
+                            },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -678,6 +936,10 @@ fun FullscreenLyricsSheet(
     }
 
     var showNowPlayingSheet by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showShareLyricsSheet by rememberSaveable {
         mutableStateOf(false)
     }
 
@@ -988,16 +1250,13 @@ fun FullscreenLyricsSheet(
                     // Share Lyrics Button
                     IconButton(
                         onClick = {
-                            isShareMode = !isShareMode
-                            if (!isShareMode) {
-                                selectedLineIndexes = emptySet()
-                            }
+                            showShareLyricsSheet = true
                         },
                     ) {
                         Icon(
                             imageVector = SimpIcons.Share,
                             contentDescription = stringResource(Res.string.share_lyrics),
-                            tint = if (isShareMode) Color(0xFFFFD54F) else Color.White,
+                            tint = Color.White,
                         )
                     }
 
@@ -1403,6 +1662,28 @@ fun FullscreenLyricsSheet(
                 isShareMode = false
                 selectedLineIndexes = emptySet()
             },
+        )
+    }
+    if (showShareLyricsSheet) {
+        val shareLines = remember(screenDataState.lyricsData) {
+            screenDataState.lyricsData?.toShareLyricsLines().orEmpty()
+        }
+        val fullscreenLyricsOffsetMs by sharedViewModel.getLyricsOffsetMs().collectAsStateWithLifecycle(0L)
+        val shareTimedLineIndexes = remember(screenDataState.lyricsData?.lyrics?.lines) {
+            screenDataState.lyricsData?.lyrics?.lines
+                .orEmpty()
+                .mapIndexedNotNull { index, line ->
+                    line.startTimeMs.toLongOrNull()?.let { TimedLineIndex(index, it) }
+                }.sortedBy { it.startTimeMs }
+        }
+        ShareLyricsSheet(
+            lines = shareLines,
+            songTitle = screenDataState.nowPlayingTitle,
+            artistName = screenDataState.artistName,
+            artwork = screenDataState.bitmap,
+            seedColor = startColor.value,
+            initialLineIndex = shareTimedLineIndexes.activeIndexAt(timelineState.current - fullscreenLyricsOffsetMs),
+            onDismiss = { showShareLyricsSheet = false },
         )
     }
 }
