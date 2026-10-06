@@ -82,10 +82,6 @@ import com.maxrave.simpmusic.ui.icon.QueueMusic
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.theme.LocalForceDarkText
 import com.maxrave.simpmusic.ui.theme.typo
-import io.github.alexzhirkevich.compottie.Compottie
-import io.github.alexzhirkevich.compottie.LottieCompositionSpec
-import io.github.alexzhirkevich.compottie.rememberLottieComposition
-import io.github.alexzhirkevich.compottie.rememberLottiePainter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -128,11 +124,6 @@ fun SongFullWidthItems(
         .getSongAsFlow(songEntity?.videoId ?: track?.videoId ?: "")
         .mapNotNull { it?.downloadState }
         .collectAsState(initial = DownloadState.STATE_NOT_DOWNLOADED)
-    val composition by rememberLottieComposition {
-        LottieCompositionSpec.JsonString(
-            Res.readBytes("files/audio_playing_animation.json").decodeToString(),
-        )
-    }
     val offsetX = remember { Animatable(initialValue = 0f) }
     var heightDp by remember { mutableStateOf(0.dp) }
 
@@ -212,13 +203,8 @@ fun SongFullWidthItems(
                 ) {
                     Crossfade(isPlaying) {
                         if (it) {
-                            Image(
-                                painter =
-                                    rememberLottiePainter(
-                                        composition = composition,
-                                        iterations = Compottie.IterateForever,
-                                    ),
-                                contentDescription = "Lottie animation",
+                            AudioPlayingIndicator(
+                                modifier = Modifier.fillMaxSize(),
                             )
                         } else if (index == null) {
                             val thumb = track?.thumbnails?.lastOrNull()?.url ?: songEntity?.thumbnails
@@ -358,11 +344,6 @@ fun SuggestItems(
 ) {
     val contentColor = if (forceDark) Color.White else MaterialTheme.colorScheme.onSurface
     val subtitleColor = if (forceDark) Color(0xC4FFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-    val composition by rememberLottieComposition {
-        LottieCompositionSpec.JsonString(
-            Res.readBytes("files/audio_playing_animation.json").decodeToString(),
-        )
-    }
     Box(
         modifier =
             Modifier
@@ -381,13 +362,8 @@ fun SuggestItems(
             Box(modifier = Modifier.size(40.dp)) {
                 Crossfade(isPlaying) {
                     if (it) {
-                        Image(
-                            painter =
-                                rememberLottiePainter(
-                                    composition = composition,
-                                    iterations = Compottie.IterateForever,
-                                ),
-                            contentDescription = "Lottie animation",
+                        AudioPlayingIndicator(
+                            modifier = Modifier.fillMaxSize(),
                         )
                     } else {
                         val thumb = track.thumbnails?.lastOrNull()?.url

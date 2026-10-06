@@ -159,10 +159,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.rememberHazeState
-import io.github.alexzhirkevich.compottie.Compottie
-import io.github.alexzhirkevich.compottie.LottieCompositionSpec
-import io.github.alexzhirkevich.compottie.rememberLottieComposition
-import io.github.alexzhirkevich.compottie.rememberLottiePainter
+import com.maxrave.simpmusic.ui.component.DownloadingIndicator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -213,12 +210,6 @@ fun LocalPlaylistScreen(
     viewModel: LocalPlaylistViewModel = koinViewModel(),
     navController: NavController,
 ) {
-    val composition by rememberLottieComposition {
-        LottieCompositionSpec.JsonString(
-            Res.readBytes("files/downloading_animation.json").decodeToString(),
-        )
-    }
-
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val aiPainter = rememberVectorPainter(SimpIcons.TipsAndUpdates)
@@ -915,13 +906,7 @@ fun LocalPlaylistScreen(
                                                                     },
                                                             contentAlignment = Alignment.Center,
                                                         ) {
-                                                            Image(
-                                                                painter =
-                                                                    rememberLottiePainter(
-                                                                        composition = composition,
-                                                                        iterations = Compottie.IterateForever,
-                                                                    ),
-                                                                contentDescription = "Lottie animation",
+                                                            DownloadingIndicator(
                                                                 modifier = Modifier.size(28.dp),
                                                             )
                                                         }
@@ -1014,13 +999,7 @@ fun LocalPlaylistScreen(
                                                                     viewModel.makeToast(runBlocking { getString(Res.string.downloading) })
                                                                 },
                                                     ) {
-                                                        Image(
-                                                            painter =
-                                                                rememberLottiePainter(
-                                                                    composition = composition,
-                                                                    iterations = Compottie.IterateForever,
-                                                                ),
-                                                            contentDescription = "Lottie animation",
+                                                        DownloadingIndicator(
                                                             modifier = Modifier.fillMaxSize(),
                                                         )
                                                     }

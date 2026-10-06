@@ -74,7 +74,6 @@ okio = "3.18.1"
 material3-multiplatform = "1.12.0-alpha01" # alpha01 = skiko 0.148.1 (has Matrix33.makeTranslate) to match compottie 1.12 snapshot; alpha02 bumps skiko 0.148.2 which removed it → compottie crash
 adaptive = "1.2.0"
 componentsResources = "1.11.1"
-compottie = "2.3.3"
 cmptoast = "1.0.71"
 uri = "0.0.21"
 buildkonfig = "0.22.0"
@@ -204,11 +203,6 @@ uri = { module = "com.eygraber:uri-kmp", version.ref = "uri" }
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines-android" }
-compottie = { module = "io.github.alexzhirkevich:compottie", version.ref = "compottie" }
-compottie-lite = { module = "io.github.alexzhirkevich:compottie-lite", version.ref = "compottie" }
-compottie-dot = { module = "io.github.alexzhirkevich:compottie-dot", version.ref = "compottie" }
-compottie-network = { module = "io.github.alexzhirkevich:compottie-network", version.ref = "compottie" }
-compottie-resources = { module = "io.github.alexzhirkevich:compottie-resources", version.ref = "compottie" }
 cmptoast = { module = "network.chaintech:cmptoast", version.ref = "cmptoast" }
 file-picker = { module = "com.mohamedrejeb.calf:calf-file-picker", version.ref = "calf" }
 native-tray = { module = "io.github.kdroidfilter:composenativetray", version.ref = "tray" }
