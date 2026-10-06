@@ -192,6 +192,7 @@ import simpmusic.composeapp.generated.resources.blog_notification_description
 import simpmusic.composeapp.generated.resources.blog_notification_title
 import simpmusic.composeapp.generated.resources.buy_me_a_coffee
 import simpmusic.composeapp.generated.resources.cancel
+import simpmusic.composeapp.generated.resources.animated_artwork_info
 import simpmusic.composeapp.generated.resources.canvas_info
 import simpmusic.composeapp.generated.resources.categories_sponsor_block
 import simpmusic.composeapp.generated.resources.change
@@ -232,15 +233,23 @@ import simpmusic.composeapp.generated.resources.discord_integration
 import simpmusic.composeapp.generated.resources.donation
 import simpmusic.composeapp.generated.resources.download_quality
 import simpmusic.composeapp.generated.resources.downloaded_cache
+import simpmusic.composeapp.generated.resources.enable_animated_artwork
 import simpmusic.composeapp.generated.resources.enable_canvas
 import simpmusic.composeapp.generated.resources.enable_liquid_glass_effect
 import simpmusic.composeapp.generated.resources.enable_liquid_glass_effect_description
+import simpmusic.composeapp.generated.resources.delay_effect
+import simpmusic.composeapp.generated.resources.delay_effect_description
 import simpmusic.composeapp.generated.resources.enable_rich_presence
 import simpmusic.composeapp.generated.resources.enable_sponsor_block
 import simpmusic.composeapp.generated.resources.enable_spotify_lyrics
 import simpmusic.composeapp.generated.resources.equalizer
 import simpmusic.composeapp.generated.resources.equalizer_description
+import simpmusic.composeapp.generated.resources.equalizer_type
+import simpmusic.composeapp.generated.resources.equalizer_type_built_in
+import simpmusic.composeapp.generated.resources.equalizer_type_system
 import simpmusic.composeapp.generated.resources.free_space
+import simpmusic.composeapp.generated.resources.reverb_effect
+import simpmusic.composeapp.generated.resources.reverb_effect_description
 import simpmusic.composeapp.generated.resources.gemini
 import simpmusic.composeapp.generated.resources.guest
 import simpmusic.composeapp.generated.resources.help_build_lyrics_database
@@ -487,6 +496,7 @@ fun SettingScreen(
     val spotifyLoggedIn by viewModel.spotifyLogIn.collectAsStateWithLifecycle()
     val spotifyLyrics by viewModel.spotifyLyrics.collectAsStateWithLifecycle()
     val spotifyCanvas by viewModel.spotifyCanvas.collectAsStateWithLifecycle()
+    val amAnimatedArtwork by viewModel.amAnimatedArtwork.collectAsStateWithLifecycle()
     val enableSponsorBlock by remember { viewModel.sponsorBlockEnabled.map { it == TRUE } }.collectAsStateWithLifecycle(initialValue = false)
     val skipSegments by viewModel.sponsorBlockCategories.collectAsStateWithLifecycle()
     val playerCache by viewModel.cacheSize.collectAsStateWithLifecycle()
@@ -535,7 +545,10 @@ fun SettingScreen(
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDuration.collectAsStateWithLifecycle()
     val crossfadeDjMode by viewModel.crossfadeDjMode.collectAsStateWithLifecycle()
+    val equalizerType by viewModel.equalizerType.collectAsStateWithLifecycle(initialValue = DataStoreManager.EQUALIZER_TYPE_BUILT_IN)
     val equalizerEnabled by viewModel.equalizerEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val delayEnabled by viewModel.delayEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val reverbEnabled by viewModel.reverbEnabled.collectAsStateWithLifecycle(initialValue = false)
     val castState by viewModel.castState.collectAsStateWithLifecycle()
 
     val isCheckingUpdate by sharedViewModel.isCheckingUpdate.collectAsStateWithLifecycle()
@@ -1115,29 +1128,91 @@ fun SettingScreen(
                         subtitle = stringResource(Res.string.skip_no_music_part),
                         switch = (skipSilent to { viewModel.setSkipSilent(it) }),
                     )
-                    SettingItem(
-                        title = stringResource(Res.string.equalizer),
-                        subtitle = stringResource(Res.string.equalizer_description),
-                        switch = (equalizerEnabled to { viewModel.setEqualizerEnabled(it) }),
-                    )
-                    AnimatedVisibility(visible = equalizerEnabled) {
-                        EqualizerSection(viewModel)
+                    if (getPlatform() == Platform.Android) {
+                        SettingItem(
+                            title = stringResource(Res.string.equalizer_type),
+                            subtitle =
+                                if (equalizerType == DataStoreManager.EQUALIZER_TYPE_SYSTEM) {
+                                    stringResource(Res.string.equalizer_type_system)
+                                } else {
+                                    stringResource(Res.string.equalizer_type_built_in)
+                                },
+                            onClick = {
+                                viewModel.setAlertData(
+                                    SettingAlertState(
+                                        title = runBlocking { getString(Res.string.equalizer_type) },
+                                        selectOne =
+                                            SettingAlertState.SelectData(
+                                                listSelect =
+                                                    listOf(
+                                                        (equalizerType == DataStoreManager.EQUALIZER_TYPE_BUILT_IN) to
+                                                            runBlocking { getString(Res.string.equalizer_type_built_in) },
+                                                        (equalizerType == DataStoreManager.EQUALIZER_TYPE_SYSTEM) to
+                                                            runBlocking { getString(Res.string.equalizer_type_system) },
+                                                    ),
+                                            ),
+                                        confirm =
+                                            runBlocking { getString(Res.string.change) } to { state ->
+                                                val builtInStr = runBlocking { getString(Res.string.equalizer_type_built_in) }
+                                                viewModel.setEqualizerType(
+                                                    if (state.selectOne?.getSelected() == builtInStr) {
+                                                        DataStoreManager.EQUALIZER_TYPE_BUILT_IN
+                                                    } else {
+                                                        DataStoreManager.EQUALIZER_TYPE_SYSTEM
+                                                    },
+                                                )
+                                            },
+                                        dismiss = runBlocking { getString(Res.string.cancel) },
+                                    ),
+                                )
+                            },
+                        )
+                        AnimatedVisibility(visible = equalizerType == DataStoreManager.EQUALIZER_TYPE_SYSTEM) {
+                            SettingItem(
+                                title = stringResource(Res.string.open_system_equalizer),
+                                subtitle =
+                                    if (castState.isRemote) {
+                                        stringResource(Res.string.not_available_while_casting)
+                                    } else {
+                                        stringResource(Res.string.use_your_system_equalizer)
+                                    },
+                                isEnable = !castState.isRemote,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        resultLauncher.launch()
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    AnimatedVisibility(visible = getPlatform() != Platform.Android || equalizerType == DataStoreManager.EQUALIZER_TYPE_BUILT_IN) {
+                        Column {
+                            SettingItem(
+                                title = stringResource(Res.string.equalizer),
+                                subtitle = stringResource(Res.string.equalizer_description),
+                                switch = (equalizerEnabled to { viewModel.setEqualizerEnabled(it) }),
+                            )
+                            AnimatedVisibility(visible = equalizerEnabled) {
+                                EqualizerSection(viewModel)
+                            }
+                        }
                     }
                     SettingItem(
-                        title = stringResource(Res.string.open_system_equalizer),
-                        subtitle =
-                            if (castState.isRemote) {
-                                stringResource(Res.string.not_available_while_casting)
-                            } else {
-                                stringResource(Res.string.use_your_system_equalizer)
-                            },
-                        isEnable = !castState.isRemote,
-                        onClick = {
-                            coroutineScope.launch {
-                                resultLauncher.launch()
-                            }
-                        },
+                        title = stringResource(Res.string.delay_effect),
+                        subtitle = stringResource(Res.string.delay_effect_description),
+                        switch = (delayEnabled to { viewModel.setDelayEnabled(it) }),
                     )
+                    AnimatedVisibility(visible = delayEnabled) {
+                        DelaySection(viewModel)
+                    }
+                    SettingItem(
+                        title = stringResource(Res.string.reverb_effect),
+                        subtitle = stringResource(Res.string.reverb_effect_description),
+                        switch = (reverbEnabled to { viewModel.setReverbEnabled(it) }),
+                    )
+                    AnimatedVisibility(visible = reverbEnabled) {
+                        ReverbSection(viewModel)
+                    }
                 }
             }
         }
@@ -1680,6 +1755,14 @@ fun SettingScreen(
                             viewModel.setSpotifyCanvas(false)
                         }
                     },
+                )
+                // Sits with the canvas because it replaces it, but carries no isEnable: the two
+                // rows above need a Spotify session and this one needs no account at all, so
+                // gating it on spotifyLoggedIn would lock it away from the users it works for.
+                SettingItem(
+                    title = stringResource(Res.string.enable_animated_artwork),
+                    subtitle = stringResource(Res.string.animated_artwork_info),
+                    switch = (amAnimatedArtwork to { viewModel.setAMAnimatedArtwork(it) }),
                 )
             }
         }

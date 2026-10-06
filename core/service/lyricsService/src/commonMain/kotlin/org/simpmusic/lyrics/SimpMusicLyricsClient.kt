@@ -5,8 +5,13 @@ import com.maxrave.ktorext.crypto.HmacUri
 import com.maxrave.logger.Logger
 import io.ktor.client.call.body
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import org.simpmusic.lyrics.am.AMAlbumResource
 import org.simpmusic.lyrics.am.AMArtistResource
 import org.simpmusic.lyrics.am.AMSearchResponse
+import org.simpmusic.lyrics.am.AMSongWithAlbum
+import org.simpmusic.lyrics.am.parseAMHlsVariants
+import org.simpmusic.lyrics.am.pickAMRendition
 import org.simpmusic.lyrics.models.request.LyricsBody
 import org.simpmusic.lyrics.models.request.TranslatedLyricsBody
 import org.simpmusic.lyrics.models.response.BaseResponse
@@ -188,6 +193,84 @@ class SimpMusicLyricsClient {
                 .resources
                 ?.artists
                 ?.get(id)
+        }
+
+    /**
+     * Search the AM catalog for an album. Returns the albums preserving search ranking order.
+     */
+    suspend fun searchAMAlbum(
+        query: String,
+        limit: Int = 10,
+    ): Result<List<AMAlbumResource>> =
+        runCatching {
+            val response = lyricsService.searchAMAlbum(query, limit)
+            if (response.status.value !in 200..299) {
+                throw Exception("AM album search failed: ${response.status.value}")
+            }
+            val parsed = response.body<AMSearchResponse>()
+            val resources = parsed.resources?.albums.orEmpty()
+            parsed.results
+                ?.albums
+                ?.data
+                ?.mapNotNull { resources[it.id] }
+                ?: resources.values.toList()
+        }
+
+    /**
+     * Search the AM catalog for songs matching [query], paired with their parent album if present.
+     */
+    suspend fun searchAMSongsWithAlbums(
+        query: String,
+        limit: Int = 10,
+    ): Result<List<AMSongWithAlbum>> =
+        runCatching {
+            val response = lyricsService.searchAMSongs(query, limit)
+            if (response.status.value !in 200..299) {
+                throw Exception("AM song search failed: ${response.status.value}")
+            }
+            val parsed = response.body<AMSearchResponse>()
+            val songResources = parsed.resources?.songs.orEmpty()
+            val albumResources = parsed.resources?.albums.orEmpty()
+            val songList =
+                parsed.results
+                    ?.songs
+                    ?.data
+                    ?.mapNotNull { songResources[it.id] }
+                    ?: songResources.values.toList()
+            songList.mapNotNull { song ->
+                val parentAlbumId = song.relationships?.albums?.data?.firstOrNull()?.id
+                val album = parentAlbumId?.let { albumResources[it] } ?: return@mapNotNull null
+                AMSongWithAlbum(
+                    songName = song.attributes?.name,
+                    artistName = song.attributes?.artistName,
+                    durationInMillis = song.attributes?.durationInMillis,
+                    album = album,
+                )
+            }
+        }
+
+    /**
+     * Resolve an animated-artwork master playlist down to the single rendition worth playing, and
+     * return its media-playlist url.
+     *
+     * Doing this here rather than leaving it to the player is what makes the two platforms agree:
+     * mpv defaults to `--hls-bitrate=max` and would take the top of the ladder — on a measured
+     * artwork that is 2048x2732 10-bit HEVC at 20 Mbps, 52 MB for a 22-second loop — while
+     * ExoPlayer would pick by its own bandwidth estimate. Handing both a chosen rendition removes
+     * the question. Returns null when the url is not a master playlist.
+     */
+    suspend fun selectAMRendition(
+        masterUrl: String,
+        minWidth: Int,
+    ): Result<String?> =
+        runCatching {
+            val response = lyricsService.fetchAMHlsPlaylist(masterUrl)
+            if (response.status.value !in 200..299) {
+                throw Exception("AM playlist fetch failed: ${response.status.value}")
+            }
+            parseAMHlsVariants(response.bodyAsText(), masterUrl)
+                .pickAMRendition(minWidth)
+                ?.uri
         }
 
     private suspend inline fun <reified T> HttpResponse.bodyOrThrow(): T {

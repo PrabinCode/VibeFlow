@@ -1,5 +1,6 @@
-package com.simpmusic.media_jvm.mpv
+﻿package com.simpmusic.media_jvm.mpv
 
+import com.maxrave.domain.data.player.AudioEffects
 import com.maxrave.logger.Logger
 import com.sun.jna.Memory
 import com.sun.jna.Pointer
@@ -113,6 +114,46 @@ class MpvPlayer private constructor(
 
         /** `@label:` of the rubberband entry that carries the AutoMix pitch match. */
         private const val PITCH_LABEL = "simpDjPitch"
+
+        /**
+         * `@label:` of the equalizer entry, kept apart from the crossfade labels because the two
+         * tiers are installed and removed independently — see [applyAudioFilters].
+         */
+        private const val EQ_LABEL = "simpEq"
+
+        /** `@label:` of the multi-tap echo entry. */
+        private const val FX_ECHO_LABEL = "simpFxEcho"
+
+        /**
+         * `@label:` of the convolution reverb entry, which is also the `af-command` target a mix
+         * change addresses — see [setReverbMix].
+         */
+        private const val FX_REVERB_LABEL = "simpFxReverb"
+
+        /**
+         * Set once this libmpv has proven it cannot build the convolution reverb graph.
+         *
+         * A property of the LIBRARY rather than of a handle, which is why it lives here: the Linux
+         * bundle is compiled `--disable-filters --enable-filter=…` and ships no `afir`, `amovie`,
+         * `asplit` or `amix`, so every handle in the process fails identically. Remembering it
+         * once is what stops a fresh handle per track from re-running the fallback — and re-logging
+         * the warning — on every single song.
+         *
+         * Latching on one rejection is only sound because of a precondition upstream:
+         * `ReverbIrFiles` validates the cached impulse response against its exact expected byte
+         * length before handing over a path, so the other way this graph gets refused — a cache
+         * file too short for `amovie` to open — has already been ruled out, and what is left really
+         * is a build without the filters.
+         */
+        @Volatile
+        private var reverbFiltersUnavailable = false
+
+        /** Whether the convolution reverb can be built at all on this libmpv. */
+        private val reverbFiltersSupported: Boolean
+            get() = !reverbFiltersUnavailable
+
+        /** ISO octave centres for a ten-band equalizer, the spacing AutoEq profiles assume. */
+        val EQ_BANDS_HZ = listOf(31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000)
 
         /**
          * Create and initialize a libmpv handle.
@@ -550,11 +591,26 @@ class MpvPlayer private constructor(
         command("stop")
     }
 
-    // Volume is split in two so a crossfade can ramp one handle without disturbing the level the
-    // user set: `masterPercent` is the pipeline volume (the slider), `fadePercent` is this handle's
-    // own crossfade ramp. [applyVolume] decides how each reaches mpv.
+    // Volume is split in three so each owner can move its own level without disturbing the others:
+    // `masterPercent` is the pipeline volume (the slider), `fadePercent` is this handle's own
+    // crossfade ramp, and `sleepPercent` is the sleep timer's fade-out. [applyVolume] decides how
+    // each reaches mpv.
+    //
+    // Three threads write these: the crossfade ramp on the player thread, the volume slider from
+    // the UI thread, and the event pump when the audio output is reconfigured. Reading all three
+    // and issuing the resulting property writes is therefore done under [volumeLock] — volatile
+    // alone would stop torn reads but not stop two threads interleaving their pairs of mpv calls
+    // and leaving the device on a combination neither of them intended.
+    private val volumeLock = Any()
+
+    @Volatile
     private var masterPercent = 100
+
+    @Volatile
     private var fadePercent = 100
+
+    @Volatile
+    private var sleepPercent = 100
 
     /**
      * The pipeline volume — what the volume slider controls. Must NOT be touched while a crossfade
@@ -564,8 +620,10 @@ class MpvPlayer private constructor(
      */
     fun setMasterVolume(volume: Int) {
         if (isReleased) return
-        masterPercent = volume.coerceIn(0, 100)
-        applyVolume()
+        synchronized(volumeLock) {
+            masterPercent = volume.coerceIn(0, 100)
+            applyVolume()
+        }
     }
 
     /**
@@ -575,26 +633,66 @@ class MpvPlayer private constructor(
      */
     fun setFadeVolume(volume: Int) {
         if (isReleased) return
-        fadePercent = volume.coerceIn(0, 100)
-        applyVolume()
+        synchronized(volumeLock) {
+            fadePercent = volume.coerceIn(0, 100)
+            applyVolume()
+        }
+    }
+
+    /**
+     * The sleep timer's fade-out, 0..100 where 100 means "no attenuation".
+     *
+     * Rides on the master rather than on [setFadeVolume] for two reasons: the crossfade ramp is
+     * reset to 100 every time a handle becomes current, which would wipe a fade still in progress,
+     * and the master reaches the device mixer, so it takes effect immediately instead of trailing
+     * the audio-output buffer by a second or two — a ramp measured in seconds cannot afford that lag.
+     */
+    fun setSleepFadeVolume(volume: Int) {
+        if (isReleased) return
+        synchronized(volumeLock) {
+            sleepPercent = volume.coerceIn(0, 100)
+            applyVolume()
+        }
+    }
+
+    /**
+     * Set the master and the sleep fade together, for a handle that is being brought up to the
+     * levels already in force elsewhere.
+     *
+     * Doing it in two calls would publish the new master against the *old* sleep fade first, and
+     * since `ao-volume` is shared across handles that intermediate value is audible on whatever is
+     * playing — a full-volume blip in the middle of a fade.
+     */
+    fun setVolumeLevels(
+        master: Int,
+        sleep: Int,
+    ) {
+        if (isReleased) return
+        synchronized(volumeLock) {
+            masterPercent = master.coerceIn(0, 100)
+            sleepPercent = sleep.coerceIn(0, 100)
+            applyVolume()
+        }
     }
 
     /**
      * `volume` is mpv's *software* volume: applied inside the filter chain, so audio already queued
      * in the audio-output buffer keeps playing at the previous level — audible as a couple of
      * seconds of lag after the slider is released. `ao-volume` drives the audio device's own mixer
-     * and takes effect immediately, so the master rides on that and the software volume is left to
-     * carry the fade alone (mpv applies the two independently — they multiply). When the audio
-     * output exposes no mixer control, both collapse into the software volume so the user's level is
-     * still honoured.
+     * and takes effect immediately, so the master and the sleep fade ride on that and the software
+     * volume is left to carry the crossfade ramp alone (mpv applies the two independently — they
+     * multiply). When the audio output exposes no mixer control, all three collapse into the
+     * software volume so the user's level is still honoured.
      */
-    private fun applyVolume() {
-        if (setPropertyDouble("ao-volume", masterPercent.toDouble(), logFailure = false) >= 0) {
-            setPropertyDouble("volume", fadePercent.toDouble())
-        } else {
-            setPropertyDouble("volume", masterPercent * fadePercent / 100.0)
+    private fun applyVolume() =
+        synchronized(volumeLock) {
+            val master = masterPercent * sleepPercent / 100.0
+            if (setPropertyDouble("ao-volume", master, logFailure = false) >= 0) {
+                setPropertyDouble("volume", fadePercent.toDouble())
+            } else {
+                setPropertyDouble("volume", master * fadePercent / 100.0)
+            }
         }
-    }
 
     fun setMute(mute: Boolean) {
         if (isReleased) return
@@ -604,6 +702,19 @@ class MpvPlayer private constructor(
     fun setRate(rate: Float) {
         if (isReleased) return
         setPropertyDouble("speed", rate.toDouble())
+    }
+
+    /**
+     * How much of the video may be cropped to fill the render target, 0.0 (letterbox, mpv's
+     * default) to 1.0 (cover it completely).
+     *
+     * This has to be mpv's job rather than the caller's: mpv scales and letterboxes each frame
+     * into the size reported through the render context, so by the time a frame reaches Compose
+     * the black bars are already part of the pixels and no `ContentScale` can remove them.
+     */
+    fun setPanscan(value: Double) {
+        if (isReleased) return
+        setPropertyDouble("panscan", value.coerceIn(0.0, 1.0))
     }
 
     // ================= DJ crossfade audio chain =================
@@ -672,6 +783,159 @@ class MpvPlayer private constructor(
         return CrossfadeChain.NONE
     }
 
+    /**
+     * The equalizer entry, or null while the equalizer is off or flat.
+     *
+     * Held here because `af` is one property: writing it replaces the entire chain, so every write
+     * has to carry both tiers. Crossfade used to write the property directly, which is why
+     * anything else placed in `af` vanished the moment a transition started or ended.
+     */
+    @Volatile
+    private var eqEntry: String? = null
+
+    /**
+     * The echo and reverb entries currently installed, in chain order.
+     *
+     * A third tier of its own rather than part of either neighbour: the effects outlive a
+     * crossfade (which clears only its own entries at the end of every transition) and change
+     * independently of the equalizer, so folding them into either list would make one setting
+     * erase the other.
+     */
+    @Volatile
+    private var fxEntries: List<String> = emptyList()
+
+    /** Crossfade entries currently installed, so an equalizer change can rewrite around them. */
+    @Volatile
+    private var crossfadeEntries: List<String> = emptyList()
+
+    /**
+     * Write `af` from all three tiers at once.
+     *
+     * Order is the design. The equalizer goes first so everything after it works on the curve the
+     * user chose. The effects sit next, so echo and reverb act on the equalised signal rather than
+     * on one that is about to be re-shaped behind them. The crossfade sweep goes last so it also
+     * sweeps the effects' tails — a reverb that kept ringing at full brightness through a
+     * transition would be the one thing in the mix that refuses to fade.
+     */
+    private fun applyAudioFilters(): Boolean {
+        val entries = listOfNotNull(eqEntry) + fxEntries + crossfadeEntries
+        return setPropertyString("af", entries.joinToString(","))
+    }
+
+    /**
+     * Install a ten-band equalizer, or remove it when every band and the preamp are at zero.
+     *
+     * Each band is a peaking filter on its ISO centre at Q 1.41 — the width at which ten
+     * octave-spaced bands overlap without leaving gaps or stacking into ripple. [preampDb] is a
+     * plain gain in front: boosting bands without pulling the level down first is what clips.
+     */
+    fun setEqualizer(
+        bandsDb: List<Float>,
+        preampDb: Float,
+    ): Boolean {
+        if (isReleased) return false
+        val flat = preampDb == 0f && bandsDb.all { it == 0f }
+        eqEntry =
+            if (flat) {
+                null
+            } else {
+                val stages =
+                    EQ_BANDS_HZ.mapIndexed { index, hz ->
+                        val gain = bandsDb.getOrElse(index) { 0f }
+                        "equalizer=f=$hz:width_type=q:width=1.41:g=${mpvNumber(gain)}"
+                    }
+                // Wrapped in [ ] for the same reason the crossfade sweep is: the graph contains
+                // `,` and `=`, which mpv's own filter-list parser would otherwise consume.
+                "@$EQ_LABEL:lavfi=[volume=${mpvNumber(preampDb)}dB,${stages.joinToString(",")}]"
+            }
+        return applyAudioFilters()
+    }
+
+    /**
+     * Install the echo and reverb tier, or remove it when [effects] carries neither.
+     *
+     * Both entries are built from the same numbers Android's processors read, so a setting sounds
+     * the same on either backend — see `MpvEffectGraphs` for the graphs themselves.
+     *
+     * The tiered fallback mirrors [installCrossfadeChain]'s treatment of the optional `rubberband`
+     * build: `af` is ONE property, so a filter this libmpv does not have does not fail on its own —
+     * mpv rejects the entire string and the equalizer disappears with it. The Linux bundle really
+     * is built without `afir`/`amovie`/`asplit`/`amix`, so this is the expected path there, not a
+     * theoretical one. Anything that cannot be installed is dropped and the rest is re-applied.
+     *
+     * @param reverbIrPath the impulse response WAV, which `amovie` opens while mpv is still
+     *   PARSING the graph — a missing file therefore fails the whole chain rather than just the
+     *   reverb, which is why a null path means "no reverb entry" instead of "try it and see".
+     * @return true only when everything [effects] asked for is now in the chain. An entry that had
+     *   to be dropped — an echo outside aecho's ranges, a reverb with no impulse response or no
+     *   filters to build it — reports false even though the write itself succeeded, because the
+     *   caller's real question is whether the effect it just enabled is actually running.
+     */
+    fun setAudioEffects(
+        effects: AudioEffects,
+        reverbIrPath: String?,
+    ): Boolean {
+        if (isReleased) return false
+
+        val delay = effects.delay
+        val echoGraph = delay?.let { aechoGraph(it.taps()) }
+        if (delay != null && echoGraph == null) {
+            Logger.w(TAG, "Echo settings fall outside aecho's accepted ranges; leaving the echo out of the chain")
+        }
+        val echoEntry = echoGraph?.let { "@$FX_ECHO_LABEL:lavfi=[$it]" }
+
+        val reverb = effects.reverb
+        val reverbEntry =
+            when {
+                reverb == null -> null
+                // Already proven impossible on this build; skip straight past the fallback so a
+                // new handle per track does not re-run it, and does not re-log its warning.
+                !reverbFiltersSupported -> null
+                reverbIrPath == null -> {
+                    Logger.w(TAG, "Reverb requested with no impulse response file; leaving the reverb out of the chain")
+                    null
+                }
+                else -> "@$FX_REVERB_LABEL:lavfi=[${convolutionReverbGraph(reverbIrPath, reverb.mix)}]"
+            }
+
+        // Asked for but not expressible. Tracked rather than inferred from the entry list, since
+        // "no echo entry" means one thing when the user wants an echo and another when they do not.
+        val dropped = (delay != null && echoEntry == null) || (reverb != null && reverbEntry == null)
+
+        if (applyFxEntries(listOfNotNull(echoEntry, reverbEntry))) return !dropped
+
+        if (reverbEntry != null && applyFxEntries(listOfNotNull(echoEntry))) {
+            reverbFiltersUnavailable = true
+            Logger.w(TAG, "reverb unavailable: this libmpv build lacks afir/amovie/asplit/amix")
+            return false
+        }
+        // aecho ships with every FFmpeg, so reaching here means something else is wrong with the
+        // chain. Blank the tier anyway: leaving a rejected entry behind would keep every later
+        // equalizer write failing along with it.
+        Logger.w(TAG, "mpv rejected the audio effect chain; continuing with neither echo nor reverb")
+        applyFxEntries(emptyList())
+        return false
+    }
+
+    /** Swap in a new effects tier and rewrite `af` around the other two. */
+    private fun applyFxEntries(entries: List<String>): Boolean {
+        fxEntries = entries
+        return applyAudioFilters()
+    }
+
+    /**
+     * Retune the live wet/dry balance to [mix] without rebuilding the chain.
+     *
+     * `weights` is a runtime-settable AVOption of `amix`, so a mix drag retunes the graph in place
+     * instead of tearing down and re-creating a partitioned convolution for every slider frame.
+     * Same call shape as [setCrossfadeCutoffHz], including the explicit target: mpv's lavfi graph
+     * also holds the `abuffer`/`abuffersink` endpoints, which answer any command with `ENOSYS`.
+     */
+    fun setReverbMix(mix: Float): Boolean {
+        if (isReleased) return false
+        return command("af-command", FX_REVERB_LABEL, "weights", reverbWeights(mix), "amix")
+    }
+
     private fun applyCrossfadeChain(
         sweep: MpvCrossfadeFilter?,
         sweepStartHz: Float,
@@ -695,7 +959,8 @@ class MpvPlayer private constructor(
             // Frequencies are multiplied by this value. (default: 1.0)"*.
             entries += "@$PITCH_LABEL:rubberband=pitch-scale=1.0"
         }
-        return setPropertyString("af", entries.joinToString(","))
+        crossfadeEntries = entries
+        return applyAudioFilters()
     }
 
     /**
@@ -747,7 +1012,10 @@ class MpvPlayer private constructor(
      */
     fun clearAudioFilters() {
         if (isReleased) return
-        setPropertyString("af", "")
+        // Drops the crossfade tier only. This used to blank the whole property, which took the
+        // equalizer down with it at the end of every transition.
+        crossfadeEntries = emptyList()
+        applyAudioFilters()
     }
 
     /**
@@ -915,7 +1183,7 @@ class MpvPlayer private constructor(
  * update. (`MpvLibrary` already forces the NATIVE `LC_NUMERIC` to C for the same class of reason;
  * that does nothing for numbers formatted on the Java side.)
  */
-private fun mpvNumber(value: Float): String = String.format(Locale.ROOT, "%.4f", value)
+internal fun mpvNumber(value: Float): String = String.format(Locale.ROOT, "%.4f", value)
 
 /** mpv reports times in seconds; the whole player stack above speaks milliseconds. */
 private fun secondsToMs(seconds: Double): Long =

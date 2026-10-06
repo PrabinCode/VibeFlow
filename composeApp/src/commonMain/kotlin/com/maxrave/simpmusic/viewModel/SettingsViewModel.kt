@@ -13,6 +13,7 @@ import com.maxrave.common.VIDEO_QUALITY
 import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.domain.data.entities.GoogleAccountEntity
 import com.maxrave.domain.data.player.GenericCastState
+import com.maxrave.domain.data.player.ReverbPreset
 import com.maxrave.domain.extension.toNetScapeString
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
@@ -237,6 +238,32 @@ class SettingsViewModel(
     private var _killServiceOnExit: MutableStateFlow<String?> = MutableStateFlow(null)
     val killServiceOnExit: StateFlow<String?> = _killServiceOnExit
 
+    private val _equalizerType = MutableStateFlow(DataStoreManager.EQUALIZER_TYPE_BUILT_IN)
+    val equalizerType: StateFlow<String> = _equalizerType
+
+    private val _delayEnabled = MutableStateFlow(false)
+    val delayEnabled: StateFlow<Boolean> = _delayEnabled
+
+    private val _delayTimeMs = MutableStateFlow(DataStoreManager.DEFAULT_DELAY_TIME_MS)
+    val delayTimeMs: StateFlow<Int> = _delayTimeMs
+
+    private val _delayFeedback = MutableStateFlow(DataStoreManager.DEFAULT_DELAY_FEEDBACK)
+    val delayFeedback: StateFlow<Float> = _delayFeedback
+
+    private val _delayMix = MutableStateFlow(DataStoreManager.DEFAULT_DELAY_MIX)
+    val delayMix: StateFlow<Float> = _delayMix
+
+    private val _reverbEnabled = MutableStateFlow(false)
+    val reverbEnabled: StateFlow<Boolean> = _reverbEnabled
+
+    private val _reverbPreset = MutableStateFlow(
+        runCatching { ReverbPreset.valueOf(DataStoreManager.DEFAULT_REVERB_PRESET) }.getOrDefault(ReverbPreset.HALL),
+    )
+    val reverbPreset: StateFlow<ReverbPreset> = _reverbPreset
+
+    private val _reverbMix = MutableStateFlow(DataStoreManager.DEFAULT_REVERB_MIX)
+    val reverbMix: StateFlow<Float> = _reverbMix
+
     private val _equalizerEnabled = MutableStateFlow(false)
     val equalizerEnabled: StateFlow<Boolean> = _equalizerEnabled
 
@@ -264,6 +291,9 @@ class SettingsViewModel(
         }
         viewModelScope.launch {
             launch {
+                dataStoreManager.equalizerType.collect { _equalizerType.emit(it) }
+            }
+            launch {
                 dataStoreManager.equalizerEnabled.collect { _equalizerEnabled.emit(it == DataStoreManager.TRUE) }
             }
             launch {
@@ -279,6 +309,30 @@ class SettingsViewModel(
             }
             launch {
                 dataStoreManager.equalizerAutoEqProfile.collect { _equalizerAutoEqProfile.emit(it) }
+            }
+            launch {
+                dataStoreManager.delayEnabled.collect { _delayEnabled.emit(it == DataStoreManager.TRUE) }
+            }
+            launch {
+                dataStoreManager.delayTimeMs.collect { _delayTimeMs.emit(it) }
+            }
+            launch {
+                dataStoreManager.delayFeedback.collect { _delayFeedback.emit(it) }
+            }
+            launch {
+                dataStoreManager.delayMix.collect { _delayMix.emit(it) }
+            }
+            launch {
+                dataStoreManager.reverbEnabled.collect { _reverbEnabled.emit(it == DataStoreManager.TRUE) }
+            }
+            launch {
+                dataStoreManager.reverbPreset.collect { name ->
+                    val resolved = runCatching { ReverbPreset.valueOf(name) }.getOrDefault(ReverbPreset.HALL)
+                    _reverbPreset.emit(resolved)
+                }
+            }
+            launch {
+                dataStoreManager.reverbMix.collect { _reverbMix.emit(it) }
             }
             launch {
                 dataStoreManager.lyricsRomanization.collect { _lyricsRomanization.emit(it == DataStoreManager.TRUE) }
@@ -334,8 +388,72 @@ class SettingsViewModel(
         }
     }
 
+    fun setEqualizerType(type: String) {
+        viewModelScope.launch {
+            dataStoreManager.setEqualizerType(type)
+        }
+    }
+
     fun getEqualizer() {
         // Equalizer state is collected continuously in init block
+    }
+
+    fun setDelayEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setDelayEnabled(enabled)
+        }
+    }
+
+    fun setDelayTimeMs(timeMs: Int) {
+        viewModelScope.launch {
+            dataStoreManager.setDelayTimeMs(timeMs)
+        }
+    }
+
+    fun setDelayFeedback(feedback: Float) {
+        viewModelScope.launch {
+            dataStoreManager.setDelayFeedback(feedback)
+        }
+    }
+
+    fun setDelayMix(mix: Float) {
+        viewModelScope.launch {
+            dataStoreManager.setDelayMix(mix)
+        }
+    }
+
+    fun applyDelayPreset(
+        timeMs: Int,
+        feedback: Float,
+        mix: Float,
+    ) {
+        viewModelScope.launch {
+            dataStoreManager.setDelayTimeMs(timeMs)
+            dataStoreManager.setDelayFeedback(feedback)
+            dataStoreManager.setDelayMix(mix)
+        }
+    }
+
+    fun setReverbEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setReverbEnabled(enabled)
+        }
+    }
+
+    fun setReverbPreset(preset: ReverbPreset) {
+        viewModelScope.launch {
+            dataStoreManager.setReverbPreset(preset)
+        }
+    }
+
+    fun setReverbMix(mix: Float) {
+        viewModelScope.launch {
+            dataStoreManager.setReverbMix(mix)
+        }
+    }
+
+    fun getAudioEffects() {
+        // Audio effects are collected continuously in init block
     }
 
     fun getAudioSessionId() = mediaPlayerHandler.player.audioSessionId
@@ -368,6 +486,7 @@ class SettingsViewModel(
         getSpotifyLogIn()
         getSpotifyLyrics()
         getSpotifyCanvas()
+        getAMAnimatedArtwork()
         getUsingProxy()
         getCanvasCache()
         getTranslucentBottomBar()
@@ -1733,6 +1852,24 @@ class SettingsViewModel(
         viewModelScope.launch {
             dataStoreManager.setSpotifyCanvas(loggedIn)
             getSpotifyCanvas()
+        }
+    }
+
+    private var _amAnimatedArtwork: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val amAnimatedArtwork: StateFlow<Boolean> = _amAnimatedArtwork
+
+    fun getAMAnimatedArtwork() {
+        viewModelScope.launch {
+            dataStoreManager.amAnimatedArtwork.collect {
+                _amAnimatedArtwork.emit(it == DataStoreManager.TRUE)
+            }
+        }
+    }
+
+    fun setAMAnimatedArtwork(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setAMAnimatedArtwork(enabled)
+            getAMAnimatedArtwork()
         }
     }
 

@@ -1,6 +1,7 @@
 package com.maxrave.domain.manager
 
 import com.maxrave.domain.data.model.network.ProxyConfiguration
+import com.maxrave.domain.data.player.ReverbPreset
 import kotlinx.coroutines.flow.Flow
 
 interface DataStoreManager {
@@ -172,6 +173,71 @@ interface DataStoreManager {
 
     suspend fun setEqualizerAutoEqProfile(name: String)
 
+    /**
+     * One of [Values.EQUALIZER_TYPE_BUILT_IN], [Values.EQUALIZER_TYPE_SYSTEM]. Android only — Desktop has no system
+     * equalizer and always runs the built-in one. The two never run together.
+     */
+    val equalizerType: Flow<String>
+
+    suspend fun setEqualizerType(type: String)
+
+    /**
+     * Whether the echo/delay effect is applied.
+     *
+     * Off passes audio straight through without computing any taps. When switched off, the
+     * numbers the user dialled in stay put, so switching it back on returns to their echo rather
+     * than to the default one.
+     */
+    val delayEnabled: Flow<String>
+
+    suspend fun setDelayEnabled(enabled: Boolean)
+
+    /** Spacing between echo repeats in milliseconds — where the taps land, not how many there are. */
+    val delayTimeMs: Flow<Int>
+
+    suspend fun setDelayTimeMs(timeMs: Int)
+
+    /**
+     * How much of each repeat survives into the next one, 0..0.9.
+     *
+     * The tap count is derived from this via [com.maxrave.domain.data.player.DelayEffect.taps]: decay
+     * and a tap count are two ways of saying the same thing, and storing both creates a pair that
+     * can disagree.
+     */
+    val delayFeedback: Flow<Float>
+
+    suspend fun setDelayFeedback(feedback: Float)
+
+    /** Echo level against the dry signal, 0..1. */
+    val delayMix: Flow<Float>
+
+    suspend fun setDelayMix(mix: Float)
+
+    /**
+     * Whether the reverb is applied at all. Separate from the room and the mix on the same
+     * reasoning as [delayEnabled] — the room the user picked outlives the switch.
+     */
+    val reverbEnabled: Flow<String>
+
+    suspend fun setReverbEnabled(enabled: Boolean)
+
+    /**
+     * The room being convolved against, as the raw [ReverbPreset] name.
+     *
+     * Stored as the name and handed back unresolved because a name survives the list growing —
+     * an index is a position, and inserting a room in the middle of the list would silently move
+     * every device onto a different one. Readers resolve it themselves and fall back to the
+     * default when the stored name comes from a newer build than the one reading it.
+     */
+    val reverbPreset: Flow<String>
+
+    suspend fun setReverbPreset(preset: ReverbPreset)
+
+    /** Wet level of the reverb against the dry signal, 0..1. */
+    val reverbMix: Flow<Float>
+
+    suspend fun setReverbMix(mix: Float)
+
     val lyricsRomanization: Flow<String>
 
     suspend fun setLyricsRomanization(enabled: Boolean)
@@ -191,6 +257,14 @@ interface DataStoreManager {
     val spotifyCanvas: Flow<String>
 
     suspend fun setSpotifyCanvas(spotifyCanvas: Boolean)
+
+    /**
+     * Animated album artwork from the hidden AM catalog, used in place of a Spotify canvas. It
+     * needs no account of any kind, so unlike [spotifyCanvas] it is never gated on a login.
+     */
+    val amAnimatedArtwork: Flow<String>
+
+    suspend fun setAMAnimatedArtwork(enabled: Boolean)
 
     val spotifyClientToken: Flow<String>
 
@@ -374,6 +448,34 @@ interface DataStoreManager {
 
     suspend fun setCustomThemeColor(argbHex: String)
 
+    val crossfadeSkipAlbum: Flow<String>
+
+    suspend fun setCrossfadeSkipAlbum(enabled: Boolean)
+
+    val autoDownloadLikedSongs: Flow<String>
+
+    suspend fun setAutoDownloadLikedSongs(enabled: Boolean)
+
+    val keepServiceAlive: Flow<String>
+
+    suspend fun setKeepServiceAlive(keep: Boolean)
+
+    val nowPlayingStyle: Flow<String>
+
+    suspend fun setNowPlayingStyle(style: String)
+
+    val lyricsStyle: Flow<String>
+
+    suspend fun setLyricsStyle(style: String)
+
+    val romanizationLanguages: Flow<String>
+
+    suspend fun setRomanizationLanguages(languages: String)
+
+    val lyricsOffsetMs: Flow<Int>
+
+    suspend fun setLyricsOffsetMs(offsetMs: Int)
+
     val explicitContentEnabled: Flow<String>
 
     suspend fun setExplicitContentEnabled(enabled: Boolean)
@@ -460,6 +562,15 @@ interface DataStoreManager {
 
         const val CROSSFADE_DURATION_AUTO = 0
 
+        const val EQUALIZER_TYPE_BUILT_IN = "BUILT_IN"
+        const val EQUALIZER_TYPE_SYSTEM = "SYSTEM"
+
+        const val DEFAULT_DELAY_TIME_MS = 250
+        const val DEFAULT_DELAY_FEEDBACK = 0.4f
+        const val DEFAULT_DELAY_MIX = 0.35f
+        const val DEFAULT_REVERB_PRESET = "HALL"
+        const val DEFAULT_REVERB_MIX = 0.3f
+
         const val PROXY_TYPE_HTTP = "http"
         const val PROXY_TYPE_SOCKS = "socks"
 
@@ -479,6 +590,13 @@ interface DataStoreManager {
         const val AUTO_BACKUP_FREQUENCY_MONTHLY = "monthly"
 
         // Player Styles
+        const val NOW_PLAYING_STYLE_SPOTIFY = "SPOTIFY"
+        const val NOW_PLAYING_STYLE_M3_EXPRESSIVE = "M3_EXPRESSIVE"
+        const val NOW_PLAYING_STYLE_APPLE_MUSIC = "APPLE_MUSIC"
+
+        const val LYRICS_STYLE_CLASSIC = "CLASSIC"
+        const val LYRICS_STYLE_APPLE_MUSIC = "APPLE_MUSIC"
+
         const val PLAYER_STYLE_APPLE = "apple_music"
         const val PLAYER_STYLE_CLASSIC = "classic"
     }

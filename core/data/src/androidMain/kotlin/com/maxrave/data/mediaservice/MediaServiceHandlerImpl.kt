@@ -29,6 +29,8 @@ import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.data.model.mediaService.SponsorSkipSegments
 import com.maxrave.domain.data.model.searchResult.songs.Artist
 import com.maxrave.domain.data.model.streams.YouTubeWatchEndpoint
+import com.maxrave.domain.data.player.AudioEffects
+import com.maxrave.domain.data.player.DelayEffect
 import com.maxrave.domain.data.player.GenericCastState
 import com.maxrave.domain.data.player.GenericCommandButton
 import com.maxrave.domain.data.player.GenericMediaItem
@@ -37,6 +39,8 @@ import com.maxrave.domain.data.player.GenericPlaybackParameters
 import com.maxrave.domain.data.player.GenericTracks
 import com.maxrave.domain.data.player.PlayerConstants
 import com.maxrave.domain.data.player.PlayerError
+import com.maxrave.domain.data.player.ReverbEffect
+import com.maxrave.domain.data.player.ReverbPreset
 import com.maxrave.domain.extension.isVideo
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.extension.toGenericMediaItem
@@ -205,6 +209,10 @@ internal class MediaServiceHandlerImpl(
 
     private var normalizeVolume = false
 
+    /** Written by the equalizer-type collector; read on the player's thread by [shouldOpenOrCloseEqualizerIntent]. */
+    @Volatile
+    private var systemEqualizerSelected = false
+
     private var watchTimeList: ArrayList<Float> = arrayListOf()
 
     private var volumeNormalizationJob: Job? = null
@@ -288,12 +296,14 @@ internal class MediaServiceHandlerImpl(
         jobWatchtime = Job()
         skipSilent = runBlocking { dataStoreManager.skipSilent.first() == TRUE }
         // Collected rather than read once: equalizer adjustments while playing take effect immediately.
+        // While the system equalizer is selected the built-in curve goes flat, the same as its own switch being off.
         coroutineScope.launch {
             combine(
+                dataStoreManager.equalizerType,
                 dataStoreManager.equalizerEnabled,
                 dataStoreManager.equalizerBands,
                 dataStoreManager.equalizerPreamp,
-            ) { enabled, bands, preamp -> Triple(enabled == TRUE, bands, preamp) }
+            ) { type, enabled, bands, preamp -> Triple(enabled == TRUE && type != DataStoreManager.EQUALIZER_TYPE_SYSTEM, bands, preamp) }
                 .distinctUntilChanged()
                 .collect { (enabled, bands, preamp) ->
                     player.setEqualizer(
@@ -302,6 +312,61 @@ internal class MediaServiceHandlerImpl(
                         preampDb = if (enabled) preamp else 0f,
                     )
                 }
+        }
+        // Switching while music plays must hand over at once, or both equalizers run together: the
+        // adapter only asks to open or close when the player's own state changes, not the setting.
+        coroutineScope.launch {
+            dataStoreManager.equalizerType
+                .map { it == DataStoreManager.EQUALIZER_TYPE_SYSTEM }
+                .distinctUntilChanged()
+                .collect { system ->
+                    if (system == systemEqualizerSelected) return@collect
+                    systemEqualizerSelected = system
+                    // Main, like the adapter's own calls: both read the player's audio session.
+                    withContext(Dispatchers.Main) {
+                        if (!system) {
+                            sendCloseEqualizerIntent()
+                        } else if (player.isPlaying) {
+                            sendOpenEqualizerIntent()
+                        }
+                    }
+                }
+        }
+        // A collector of its own rather than more legs on the equalizer's: `combine` takes at most
+        // five flows with a lambda, and these seven fold into two halves that each stand alone.
+        coroutineScope.launch {
+            val delayEffects =
+                combine(
+                    dataStoreManager.delayEnabled,
+                    dataStoreManager.delayTimeMs,
+                    dataStoreManager.delayFeedback,
+                    dataStoreManager.delayMix,
+                ) { enabled, timeMs, feedback, mix ->
+                    // Off is null rather than a zero mix: the filter has to actually come out of
+                    // the audio chain, and the stored values are left alone so switching back on
+                    // returns to the user's own settings.
+                    if (enabled == TRUE) DelayEffect(timeMs = timeMs, feedback = feedback, mix = mix) else null
+                }
+            val reverbEffects =
+                combine(
+                    dataStoreManager.reverbEnabled,
+                    dataStoreManager.reverbPreset,
+                    dataStoreManager.reverbMix,
+                ) { enabled, presetName, mix ->
+                    if (enabled == TRUE) {
+                        ReverbEffect(
+                            // A room written by a newer build is a name this one has never heard
+                            // of; falling back beats letting valueOf take the whole collector down.
+                            preset = runCatching { ReverbPreset.valueOf(presetName) }.getOrDefault(ReverbPreset.HALL),
+                            mix = mix,
+                        )
+                    } else {
+                        null
+                    }
+                }
+            combine(delayEffects, reverbEffects) { echo, room -> AudioEffects(delay = echo, reverb = room) }
+                .distinctUntilChanged()
+                .collect { effects -> player.setAudioEffects(effects) }
         }
         normalizeVolume =
             runBlocking { dataStoreManager.normalizeVolume.first() == TRUE }
@@ -781,6 +846,11 @@ internal class MediaServiceHandlerImpl(
         context.sendBroadcast(
             Intent(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION).apply {
                 putExtra(AudioEffect.EXTRA_AUDIO_SESSION, player.audioSessionId)
+                // Mandatory per AudioEffect's javadoc, and missing from the pre-2.0.0 code this was
+                // restored from. AOSP's MusicFX returns early on a null package and closes sessions
+                // by package, so without it every CLOSE was ignored — and switching from the system
+                // equalizer back to the built-in one left both running until the track ended.
+                putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
             },
         )
     }
@@ -2570,6 +2640,8 @@ internal class MediaServiceHandlerImpl(
     }
 
     override fun shouldOpenOrCloseEqualizerIntent(shouldOpen: Boolean) {
+        // Built-in selected: the session is never handed to a system equalizer, so the two cannot run together.
+        if (!systemEqualizerSelected) return
         if (shouldOpen) sendOpenEqualizerIntent() else sendCloseEqualizerIntent()
     }
 

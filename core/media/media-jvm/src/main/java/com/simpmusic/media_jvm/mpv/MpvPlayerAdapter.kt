@@ -1,6 +1,7 @@
 package com.simpmusic.media_jvm.mpv
 
 import com.maxrave.common.MERGING_DATA_TYPE
+import com.maxrave.domain.data.player.AudioEffects
 import com.maxrave.domain.data.player.GenericMediaItem
 import com.maxrave.domain.data.player.GenericPlaybackParameters
 import com.maxrave.domain.data.player.PlayerConstants
@@ -11,6 +12,7 @@ import com.maxrave.domain.mediaservice.player.MediaPlayerInterface
 import com.maxrave.domain.mediaservice.player.MediaPlayerListener
 import com.maxrave.domain.repository.StreamRepository
 import com.maxrave.logger.Logger
+import com.simpmusic.media_jvm.audio.ReverbIrFiles
 import com.simpmusic.media_jvm.download.getDownloadPath
 import com.simpmusic.media_jvm.memory.MemoryTrimmer
 import kotlinx.coroutines.CancellationException
@@ -106,6 +108,13 @@ class MpvPlayerAdapter(
                 Logger.d(TAG, "Watch video enabled: $watchVideoEnabled")
             }
         }
+
+        coroutineScope.launch {
+            dataStoreManager.crossfadeSkipAlbum.collect { enabled ->
+                skipCrossfadeInAlbum = (enabled == DataStoreManager.TRUE)
+                Logger.d(TAG, "Skip crossfade inside album: $skipCrossfadeInAlbum")
+            }
+        }
     }
 
     // ========== State Management ==========
@@ -127,6 +136,20 @@ class MpvPlayerAdapter(
 
     @Volatile
     private var internalVolume = 1.0f
+
+    /** Sleep-timer fade gain, kept apart from [internalVolume] so the user's level survives it. */
+    @Volatile
+    private var internalSleepFadeFactor = 1.0f
+
+    /**
+     * Pitch shift the user asked for, 1.0 = unchanged.
+     *
+     * Only applied while crossfade is off. The crossfade owns mpv's filter chain — it installs its
+     * own rubberband entry for beatmatching and wipes the chain when a transition ends — so the two
+     * cannot both drive it. The UI locks the pitch control whenever crossfade is enabled.
+     */
+    @Volatile
+    private var internalPlaybackPitch = 1.0f
 
     @Volatile
     private var internalRepeatMode = PlayerConstants.REPEAT_MODE_OFF
@@ -169,6 +192,9 @@ class MpvPlayerAdapter(
     @Volatile
     private var crossfadeEnabled = false
 
+    /** See MediaPlayerInterface.crossfadeSuppressed — set while in a Listen Together room. */
+    override var crossfadeSuppressed: Boolean = false
+
     @Volatile
     private var crossfadeDurationMs = 5000
 
@@ -179,6 +205,14 @@ class MpvPlayerAdapter(
     // extractPlayableUrl uses to include the video stream in the edl:// merged source.
     @Volatile
     private var watchVideoEnabled = false
+
+    /** User setting: leave transitions inside an album alone. */
+    @Volatile
+    private var skipCrossfadeInAlbum = false
+
+    /** Set by the handler when an album is loaded; empty for every other kind of queue. */
+    @Volatile
+    private var internalAlbumTrackIds: Set<String> = emptySet()
 
     @Volatile
     private var secondaryPlayer: MpvPlayer? = null
@@ -192,6 +226,9 @@ class MpvPlayerAdapter(
     /** Index we're crossfading from; used when cancelling to revert localCurrentMediaItemIndex. */
     @Volatile
     private var crossfadeFromIndex = -1
+
+    /** Last index a crossfade was refused for, so the refusal is logged once instead of per poll. */
+    private var lastBlockedCrossfadeIndex = -1
 
     /**
      * Set only while [commitIncomingAsCurrent] tears down a fade. [performCrossfade]'s
@@ -250,6 +287,14 @@ class MpvPlayerAdapter(
             when (internalState) {
                 InternalState.READY, InternalState.ENDED, InternalState.PAUSED -> {
                     currentPlayer?.let { player ->
+                        // At the end of the queue the handle is parked at EOF, and telling mpv to
+                        // play there does nothing — the press would look ignored. Rewind first so
+                        // the last track replays, which is what the Play button is offering.
+                        if (internalState == InternalState.ENDED) {
+                            Logger.d(TAG, "Play: replaying from the start after end of queue")
+                            player.seekTo(0L)
+                            cachedPosition = 0L
+                        }
                         Logger.d(TAG, "Play: calling mpv play")
                         player.play()
                         transitionToState(InternalState.PLAYING)
@@ -281,30 +326,46 @@ class MpvPlayerAdapter(
     override fun pause() {
         Logger.d(TAG, "pause() called (current state: $internalState)")
         coroutineScope.launch {
-            // Pausing mid-crossfade stays on A+1 — the track the UI already shows — and freezes
-            // it in place via the when(internalState) block below. It does NOT jump back to A.
-            if (isCrossfading) {
-                Logger.d(TAG, "Pause: committing incoming (A+1) and pausing in place")
-                commitIncomingAsCurrent()
-            }
+            try {
+                // Pausing mid-crossfade stays on A+1 — the track the UI already shows — and freezes
+                // it in place via the when(internalState) block below. It does NOT jump back to A.
+                if (isCrossfading) {
+                    Logger.d(TAG, "Pause: committing incoming (A+1) and pausing in place")
+                    commitIncomingAsCurrent()
+                }
 
-            when (internalState) {
-                InternalState.PLAYING, InternalState.READY -> {
-                    currentPlayer?.let { player ->
-                        Logger.d(TAG, "Pause: calling mpv pause")
-                        player.pause()
-                        transitionToState(InternalState.PAUSED)
+                when (internalState) {
+                    InternalState.PLAYING, InternalState.READY -> {
+                        currentPlayer?.let { player ->
+                            Logger.d(TAG, "Pause: calling mpv pause")
+                            player.pause()
+                            transitionToState(InternalState.PAUSED)
+                            internalPlayWhenReady = false
+                        }
+                    }
+
+                    InternalState.PREPARING -> {
                         internalPlayWhenReady = false
+                        Logger.d(TAG, "Pause: During PREPARING - will not auto-play")
+                    }
+
+                    else -> {
+                        Logger.w(TAG, "Pause: Called in invalid state: $internalState")
                     }
                 }
-
-                InternalState.PREPARING -> {
-                    internalPlayWhenReady = false
-                    Logger.d(TAG, "Pause: During PREPARING - will not auto-play")
-                }
-
-                else -> {
-                    Logger.w(TAG, "Pause: Called in invalid state: $internalState")
+            } finally {
+                // Playback has genuinely stopped by this point, so a sleep-timer attenuation has
+                // served its purpose and is cleared here rather than by the caller. The caller
+                // cannot do it safely: pause() is asynchronous and this task suspends at
+                // commitIncomingAsCurrent() above, so anything the caller queued afterwards would
+                // run during that suspension and re-open the mixer over the last of the audio.
+                //
+                // In `finally` because that suspension point can also throw — committing a
+                // crossfade joins a job that may be cancelled. Skipping this would leave the mixer
+                // attenuated with nothing to ever restore it.
+                if (internalSleepFadeFactor < 1f) {
+                    internalSleepFadeFactor = 1f
+                    forEachLiveHandle { it.setSleepFadeVolume(100) }
                 }
             }
         }
@@ -317,19 +378,33 @@ class MpvPlayerAdapter(
                 player.stop()
                 transitionToState(InternalState.IDLE)
                 stopPositionUpdates()
-                notifyEqualizerIntent(false)
             }
         }
     }
 
     override fun seekTo(positionMs: Long) {
-        currentPlayer?.let { player ->
-            try {
-                player.seekTo(positionMs)
-                cachedPosition = positionMs
-                Logger.d(TAG, "Seeked to position: $positionMs")
-            } catch (e: Exception) {
-                Logger.e(TAG, "Seek exception: ${e.message}", e)
+        // Updated here rather than inside the coroutine so the UI reflects the seek immediately.
+        cachedPosition = positionMs
+        // The mpv call hops to the player thread, same as the volume setters: reaching into a
+        // handle from the caller's thread races the release that happens on the player thread, and
+        // a handle destroyed between the isReleased check and the native call is a use-after-free.
+        coroutineScope.launch {
+            // Seeking mid-crossfade: commit the incoming track (A+1) as current first, the same way
+            // pause() does. The progress bar the user just dragged belongs to A+1 — that is the
+            // track the UI shows and the one position updates are read from during a crossfade.
+            // Without this the seek lands on the *outgoing* track while the crossfade carries on,
+            // so the old song keeps playing underneath and the seek appears to do nothing.
+            if (isCrossfading) {
+                Logger.d(TAG, "seekTo: committing incoming (A+1) before seeking")
+                commitIncomingAsCurrent()
+            }
+            currentPlayer?.let { player ->
+                try {
+                    player.seekTo(positionMs)
+                    Logger.d(TAG, "Seeked to position: $positionMs")
+                } catch (e: Exception) {
+                    Logger.e(TAG, "Seek exception: ${e.message}", e)
+                }
             }
         }
     }
@@ -673,8 +748,9 @@ class MpvPlayerAdapter(
         index: Int,
         mediaItem: GenericMediaItem,
     ) {
+        if (index !in playlist.indices) return
+
         coroutineScope.launch {
-            if (index !in playlist.indices) return@launch
             playlist[index] = mediaItem
 
             precachedPlayers.remove(mediaItem.mediaId)?.let { cached ->
@@ -893,14 +969,21 @@ class MpvPlayerAdapter(
         }
 
     override var playbackParameters: GenericPlaybackParameters
-        get() = GenericPlaybackParameters(internalPlaybackSpeed, internalPlaybackSpeed)
+        get() = GenericPlaybackParameters(internalPlaybackSpeed, internalPlaybackPitch)
         set(value) {
             internalPlaybackSpeed = value.speed
-            currentPlayer?.let { player ->
-                try {
-                    player.setRate(value.speed)
-                } catch (e: Exception) {
-                    Logger.e(TAG, "Failed to set playback speed: ${e.message}")
+            internalPlaybackPitch = value.pitch
+            // Hopped to the player thread for the same reason as seekTo and the volume setters.
+            coroutineScope.launch {
+                // Every live handle, not just the current one: these are playback-wide settings, so
+                // the precached handles have to carry them too or the next track starts back at 1.0x.
+                forEachLiveHandle {
+                    try {
+                        it.setRate(value.speed)
+                        it.applyPitch()
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "Failed to set playback speed/pitch: ${e.message}")
+                    }
                 }
             }
         }
@@ -915,12 +998,208 @@ class MpvPlayerAdapter(
         set(value) {
             Logger.w(TAG, "Setting volume to $value")
             internalVolume = value.coerceIn(0f, 1f)
-            // mpv volume: 0-100 (100 = unattenuated). Map our 0.0-1.0 to 0-100.
-            currentPlayer?.setMasterVolume((internalVolume * 100).toInt())
+            // Same hop as sleepFadeFactor below, and for the same reason: writing mpv properties
+            // straight from the caller's thread races the player thread that releases handles, and
+            // a handle destroyed between the isReleased check and the property write is a
+            // use-after-free. The field itself is set synchronously so the getter reads back what
+            // was just written; only the mpv calls are deferred.
+            coroutineScope.launch {
+                // mpv volume: 0-100 (100 = unattenuated). Map our 0.0-1.0 to 0-100.
+                val percent = (internalVolume * 100).toInt()
+                forEachLiveHandle { it.setMasterVolume(percent) }
+            }
             notifyListeners { onVolumeChanged(internalVolume) }
         }
 
+    override var albumTrackIds: Set<String>
+        get() = internalAlbumTrackIds
+        set(value) {
+            internalAlbumTrackIds = value
+        }
+
+    override var sleepFadeFactor: Float
+        get() = internalSleepFadeFactor
+        set(value) {
+            internalSleepFadeFactor = value.coerceIn(0f, 1f)
+            // Hop onto the player thread instead of writing from the caller's — the sleep timer
+            // ramps this from Main. Three separate things depend on that hop:
+            //  - [MpvPlayer.applyVolume] reads three fields and issues two native calls, so a
+            //    second writer can interleave and publish a stale combination.
+            //  - A handle can be released between its `isReleased` check and mpv_set_property,
+            //    which is a use-after-free that has already produced a SIGSEGV here once (see the
+            //    join comment in MpvPlayer.release). Releases happen on this same thread, so
+            //    sharing it removes the window entirely.
+            //  - pause() queues onto this same single-threaded scope. Going through it is what
+            //    guarantees the timer's closing restore to 1f lands *after* playback has actually
+            //    stopped, instead of briefly re-opening the mixer over the last of the audio.
+            coroutineScope.launch {
+                // Re-read rather than capture: if the queue backs up, the pending writes collapse
+                // onto the newest value instead of replaying a stale ramp.
+                val percent = (internalSleepFadeFactor * 100).toInt()
+                forEachLiveHandle { it.setSleepFadeVolume(percent) }
+            }
+        }
+
+    /**
+     * Every handle that can currently reach the audio device.
+     *
+     * `ao-volume` is not per-handle: on Windows they all land in the process' default WASAPI
+     * session (mpv passes a NULL AudioSessionGuid), so one ISimpleAudioVolume covers the lot, and
+     * a handle left holding an older level re-asserts it on its own AUDIO_RECONFIG and overwrites
+     * everyone else's. Missing one is therefore not "that handle stays wrong", it is "that handle
+     * silently undoes the others".
+     *
+     * [secondaryPlayer] — the track fading in during a crossfade — is the easy one to miss: it is
+     * removed from [precachedPlayers] before being promoted, so it belongs to neither collection.
+     */
+    private fun forEachLiveHandle(action: (MpvPlayer) -> Unit) {
+        currentPlayer?.let(action)
+        secondaryPlayer?.let(action)
+        precachedPlayers.values.forEach { action(it.player) }
+    }
+
+    /**
+     * Push the playback-wide settings onto a handle that is about to become audible.
+     *
+     * A fresh mpv handle starts at 100/100 volume and 1.0x speed, so anything already in force has
+     * to be re-asserted here — otherwise a fade in progress jumps back to full volume mid-ramp, and
+     * a track started while the user has speed turned up plays at normal speed instead.
+     *
+     * The two volume levels go down in one call: setting them separately would publish a
+     * full-volume master onto the shared `ao-volume` before the fade is applied, which every other
+     * handle hears.
+     */
+    private fun MpvPlayer.applyPlaybackLevels() {
+        setVolumeLevels(
+            master = (internalVolume * 100).toInt(),
+            sleep = (internalSleepFadeFactor * 100).toInt(),
+        )
+        setRate(internalPlaybackSpeed)
+        applyPitch()
+        // A fresh handle starts with an empty filter chain, so the curve has to be re-applied or
+        // the equalizer silently stops working at the next track — including on secondaryPlayer,
+        // which belongs to neither collection while it is being promoted.
+        if (internalEqualizerBands.isNotEmpty() || internalEqualizerPreamp != 0f) {
+            setEqualizer(internalEqualizerBands, internalEqualizerPreamp)
+        }
+        // Same reasoning for the effects tier, and the same handle to miss: an empty chain means a
+        // track started mid-session would play dry while the switches still read "on".
+        val effects = internalAudioEffects
+        if (effects != AudioEffects.NONE) {
+            setAudioEffects(effects, ensureReverbIr(effects))
+        }
+    }
+
+    /**
+     * Put the user's pitch shift on this handle, if pitch is available at all right now.
+     *
+     * Skipped entirely while crossfade is enabled: that feature owns the filter chain — it installs
+     * its own rubberband entry for beatmatching and clears the chain when a transition ends — so
+     * touching `af` here would either be wiped or would wipe the crossfade's own filters. The UI
+     * locks the pitch control in that case, so the value stays at 1.0 anyway.
+     */
+    private fun MpvPlayer.applyPitch() {
+        if (crossfadeEnabled) return
+        if (internalPlaybackPitch == 1.0f) {
+            clearAudioFilters()
+        } else {
+            // rubberband also absorbs the tempo change once present, so setRate keeps working.
+            // Only drive the shift if mpv actually took the filter — a build without rubberband
+            // rejects it, and af-command against a filter that is not in the chain fails every time.
+            val chain = installCrossfadeChain(sweep = null, sweepStartHz = 0f, pitchShift = true)
+            if (chain.pitchShift) {
+                setPitchScale(internalPlaybackPitch)
+            } else {
+                Logger.w(TAG, "Pitch shift unavailable: mpv rejected the rubberband filter")
+            }
+        }
+    }
+
     override var skipSilenceEnabled: Boolean = false
+
+    /** Current curve, so a handle created later can be brought up to the same setting. */
+    @Volatile
+    private var internalEqualizerBands: List<Float> = emptyList()
+
+    @Volatile
+    private var internalEqualizerPreamp: Float = 0f
+
+    override fun setEqualizer(
+        bandsDb: List<Float>,
+        preampDb: Float,
+    ) {
+        internalEqualizerBands = bandsDb
+        internalEqualizerPreamp = preampDb
+        // Same hop as volume and sleepFadeFactor: mpv properties are written on the player thread,
+        // because a handle released between the isReleased check and the write is a use-after-free.
+        coroutineScope.launch {
+            forEachLiveHandle { it.setEqualizer(bandsDb, preampDb) }
+        }
+    }
+
+    /** Current effects, so a handle created later can be brought up to the same setting. */
+    @Volatile
+    private var internalAudioEffects: AudioEffects = AudioEffects.NONE
+
+    /**
+     * Whether the reverb entry is actually in the chain right now.
+     *
+     * A mix change is delivered with `af-command`, which fails outright when the filter it names is
+     * not there — and it fails silently as far as the user is concerned, since the slider still
+     * moves. So this is set from what the handles REPORTED, never from what was asked of them: it
+     * stays false when the impulse response could not be written, when libmpv has no convolution
+     * filters, and when there were no live handles to install anything on. That last case is why it
+     * cannot be inferred from the request — with nothing playing, every input to the decision looks
+     * healthy while the chain is empty. A false here only costs the next mix change its shortcut.
+     */
+    @Volatile
+    private var reverbEntryLive: Boolean = false
+
+    override fun setAudioEffects(effects: AudioEffects) {
+        val previous = internalAudioEffects
+        internalAudioEffects = effects
+        // Same hop as setEqualizer, for the same use-after-free reason.
+        coroutineScope.launch {
+            val mix = effects.reverb?.mix
+            if (mix != null && reverbEntryLive && isReverbMixOnlyChange(previous, effects)) {
+                forEachLiveHandle { it.setReverbMix(mix) }
+                return@launch
+            }
+            // Resolved before any handle is touched: generating the impulse response is file I/O,
+            // and `amovie` opens that path while mpv is parsing the chain, so it has to be on disk
+            // already or the whole `af` write fails — equalizer included.
+            val irPath = ensureReverbIr(effects)
+            // Derived from what the handles answered, not from what was asked of them: with
+            // nothing playing this loop runs zero times, and every input to the decision still
+            // looks healthy while the chain is empty. `accepted` is read into its own local first
+            // so the call cannot be short-circuited away once one handle has already said yes.
+            var installedOnAny = false
+            forEachLiveHandle { handle ->
+                val accepted = handle.setAudioEffects(effects, irPath)
+                installedOnAny = installedOnAny || accepted
+            }
+            reverbEntryLive = irPath != null && installedOnAny
+        }
+    }
+
+    /** @return the impulse response path for [effects], or null when there is no reverb to install. */
+    private fun ensureReverbIr(effects: AudioEffects): String? = effects.reverb?.let { ReverbIrFiles.ensure(it.preset)?.absolutePath }
+
+    /**
+     * Whether [next] differs from [previous] only in how much reverb is mixed in.
+     *
+     * Everything else — a different preset, a changed delay, an effect switched on or off — needs
+     * a new graph, because the impulse response and the echo taps are baked into the filter string
+     * at parse time. The mix alone is a live `amix` weight.
+     */
+    private fun isReverbMixOnlyChange(
+        previous: AudioEffects,
+        next: AudioEffects,
+    ): Boolean {
+        val before = previous.reverb ?: return false
+        val after = next.reverb ?: return false
+        return previous.delay == next.delay && before.preset == after.preset
+    }
 
     // ========== Listener Management ==========
 
@@ -1131,7 +1410,7 @@ class MpvPlayerAdapter(
                     currentPlayerIsVideo = player.videoFrames != null
                     _currentVideoFrames.value = player.videoFrames
                     setupPlayerEventsInternal(player)
-                    player.setMasterVolume((internalVolume * 100).toInt())
+                    player.applyPlaybackLevels()
 
                     if (cachedPrecache != null) {
                         // The precached handle already has the file loaded and held paused;
@@ -1310,7 +1589,6 @@ class MpvPlayerAdapter(
                         if (currentPlayer !== player) return@launch
                         if (internalState != InternalState.PLAYING) {
                             transitionToState(InternalState.PLAYING)
-                            notifyEqualizerIntent(true)
                             // Reset retry counter on successful playback
                             retryCount = 0
                             retryVideoId = null
@@ -1323,14 +1601,7 @@ class MpvPlayerAdapter(
                         if (currentPlayer !== player) return@launch
                         if (internalState == InternalState.PLAYING) {
                             transitionToState(InternalState.PAUSED)
-                            notifyEqualizerIntent(false)
                         }
-                    }
-                }
-
-                override fun stopped(player: MpvPlayer) {
-                    coroutineScope.launch {
-                        notifyEqualizerIntent(false)
                     }
                 }
 
@@ -1443,6 +1714,47 @@ class MpvPlayerAdapter(
     private fun isCurrentTrackVideo(): Boolean = watchVideoEnabled && currentMediaItem?.isVideo() == true
 
     /**
+     * Crossfade needs a track long enough that both sides of the blend are still worth hearing. At
+     * the default 5s fade a 20s track would spend half its length fading in or out, and a longer
+     * fade setting swallows it whole — so the bar scales with the fade rather than being fixed.
+     *
+     * Only the current track is measured: the next one has not been loaded yet, so its duration is
+     * unknown until it becomes current.
+     */
+    private fun isCurrentTrackTooShortForCrossfade(): Boolean {
+        val currentDuration = duration
+        if (currentDuration <= 0L) return false
+        val fadeMs =
+            if (crossfadeDurationMs == DataStoreManager.CROSSFADE_DURATION_AUTO) {
+                // Auto resolves to 20–45s, nowhere near the 5s default — measuring against the
+                // default would let a 30s track through and then swallow it whole.
+                resolveAutoCrossfadeDurationMs(
+                    currentMediaItem?.mediaId ?: "",
+                    playlist.getOrNull(getNextMediaItemIndex())?.mediaId ?: "",
+                )
+            } else {
+                crossfadeDurationMs
+            }
+        return currentDuration < maxOf(MIN_CROSSFADE_TRACK_MS, fadeMs * 3L)
+    }
+
+    /**
+     * True when both this track and the next came from the album loaded in the queue, and the user
+     * asked for albums to play through uninterrupted.
+     *
+     * Requiring *both* sides is what keeps the edges intact: the last album track into the first
+     * track endless queue appended still crossfades, because that one is not in the set.
+     */
+    private fun isWithinAlbum(): Boolean {
+        if (!skipCrossfadeInAlbum) return false
+        val ids = internalAlbumTrackIds
+        if (ids.isEmpty()) return false
+        val current = currentMediaItem?.mediaId ?: return false
+        val next = playlist.getOrNull(getNextMediaItemIndex())?.mediaId ?: return false
+        return current in ids && next in ids
+    }
+
+    /**
      * Handle track end
      */
     private fun handleTrackEndInternal() {
@@ -1456,9 +1768,12 @@ class MpvPlayerAdapter(
 
         val shouldCrossfade =
             crossfadeEnabled &&
+                !crossfadeSuppressed &&
                 hasNextMediaItem() &&
                 !isCurrentTrackVideo() &&
-                !isNextTrackVideo()
+                !isNextTrackVideo() &&
+                !isCurrentTrackTooShortForCrossfade() &&
+                !isWithinAlbum()
 
         if (shouldCrossfade) {
             val nextIndex = getNextMediaItemIndex()
@@ -1476,10 +1791,8 @@ class MpvPlayerAdapter(
                 }
 
                 else -> {
-                    if (hasNextMediaItem()) {
+                    if (localCurrentMediaItemIndex < playlist.size - 1) {
                         seekToNext()
-                    } else {
-                        notifyEqualizerIntent(false)
                     }
                 }
             }
@@ -1490,7 +1803,22 @@ class MpvPlayerAdapter(
      * Trigger crossfade to next track
      */
     private fun triggerCrossfadeTransition(nextIndex: Int) {
-        if (nextIndex !in playlist.indices || isCrossfading) return
+        if (nextIndex !in playlist.indices || isCrossfading) {
+            // Says which of the two blocked it — an index the playlist no longer holds, or a
+            // crossfading flag left set. Reported once per blocked index rather than on every poll:
+            // the position loop reaches here every 200 ms for as long as the track stays inside the
+            // trigger window, and a line repeating five times a second buries everything else.
+            if (lastBlockedCrossfadeIndex != nextIndex) {
+                lastBlockedCrossfadeIndex = nextIndex
+                Logger.w(
+                    TAG,
+                    "Crossfade not started: nextIndex=$nextIndex, playlistSize=${playlist.size}, " +
+                        "isCrossfading=$isCrossfading, currentIndex=$localCurrentMediaItemIndex",
+                )
+            }
+            return
+        }
+        lastBlockedCrossfadeIndex = -1
 
         crossfadeJob =
             coroutineScope.launch {
@@ -1499,7 +1827,7 @@ class MpvPlayerAdapter(
                     val nextMediaItem = playlist[nextIndex]
                     val nextVideoId = nextMediaItem.mediaId
 
-                    Logger.d(TAG, "Starting crossfade to track $nextIndex")
+                    Logger.d(TAG, "Starting crossfade to track $nextIndex ($nextVideoId)")
 
                     // Extract URL on IO thread (network), mpv native calls stay on service thread
                     val cachedPrecache = precachedPlayers.remove(nextVideoId)
@@ -1539,7 +1867,7 @@ class MpvPlayerAdapter(
                             },
                         )
                         nextPlayer.setMute(true)
-                        nextPlayer.setMasterVolume((internalVolume * 100).toInt())
+                        nextPlayer.applyPlaybackLevels()
                         nextPlayer.setFadeVolume(0)
                         nextPlayer.play()
                         delay(50)
@@ -1722,7 +2050,7 @@ class MpvPlayerAdapter(
 
         // It was mid fade-in, so its ramp sits somewhere below full — open it back up. The master
         // volume is untouched by the crossfade and already holds whatever the user set.
-        incoming.setMasterVolume((internalVolume * 100).toInt())
+        incoming.applyPlaybackLevels()
         incoming.setFadeVolume(100)
 
         crossfadeFromIndex = -1
@@ -1917,7 +2245,7 @@ class MpvPlayerAdapter(
         // Ensure correct volume, and drop the high-pass this player faded in under so it is back to
         // untouched playback. (Its speed/pitch were never moved — only the outgoing track is
         // adjusted — but restore them anyway, mirroring the Android finalize path.)
-        currentPlayer?.setMasterVolume((internalVolume * 100).toInt())
+        currentPlayer?.applyPlaybackLevels()
         currentPlayer?.setFadeVolume(100)
         currentPlayer?.endCrossfadeAudio()
 
@@ -1986,13 +2314,10 @@ class MpvPlayerAdapter(
                 ?: DEFAULT_BEAT_COUNT
         val duration = (bestBeatCount * beatMs).toInt()
 
-        Logger.d(
-            TAG,
-            "AutoMix duration: bpm=$currentBpm→$nextBpm, base=${baseTargetMs.toInt()}ms, " +
-                "bpmGap=${"%.2f".format(bpmGapFactor)}, keyGap=${"%.2f".format(keyGapFactor)}, " +
-                "adjusted=${adjustedTargetMs.toInt()}ms, beats=$bestBeatCount, final=${duration}ms",
-        )
-
+        // Deliberately silent. This is a pure calculation, and the position poll calls it twice
+        // every 200 ms — once through isCurrentTrackTooShortForCrossfade() and once to build the
+        // trigger threshold — so logging here buried every other line in the terminal at ten a
+        // second. The resolved value is logged where a crossfade actually starts instead.
         return duration.coerceIn(AUTO_MIN_DURATION_MS, AUTO_MAX_DURATION_MS)
     }
 
@@ -2081,6 +2406,9 @@ class MpvPlayerAdapter(
     }
 
     companion object {
+        /** Floor for the shortest track worth crossfading, in ms. */
+        private const val MIN_CROSSFADE_TRACK_MS = 20_000L
+
         private const val AUTO_FALLBACK_DURATION_MS = 30000
         private const val AUTO_MIN_DURATION_MS = 20000
         private const val AUTO_MAX_DURATION_MS = 45000
@@ -2321,10 +2649,13 @@ class MpvPlayerAdapter(
                             // Block when paused (internalPlayWhenReady=false) to prevent
                             // crossfade during queue restore.
                             if (crossfadeEnabled &&
+                                !crossfadeSuppressed &&
                                 !isCrossfading &&
                                 internalPlayWhenReady &&
                                 !isCurrentTrackVideo() &&
-                                !isNextTrackVideo()
+                                !isNextTrackVideo() &&
+                                !isCurrentTrackTooShortForCrossfade() &&
+                                !isWithinAlbum()
                             ) {
                                 val player = currentPlayer
                                 if (player != null) {
@@ -2357,7 +2688,7 @@ class MpvPlayerAdapter(
                         // Ignore query errors
                     }
 
-                    delay(200) // Update every 200ms
+                    delay(50) // Update every 50ms
                 }
             }
     }
@@ -2417,6 +2748,7 @@ class MpvPlayerAdapter(
                                 if (player == null) {
                                     Logger.w(TAG, "Precaching skipped for $idx: could not create mpv player")
                                 } else {
+                                    player.applyPlaybackLevels()
                                     player.loadFile(buildPlaybackUrl(source), startPaused = true)
                                     precachedPlayers[mediaItem.mediaId] =
                                         PrecachedPlayer(player, mediaItem, source)
@@ -2469,10 +2801,6 @@ class MpvPlayerAdapter(
         coroutineScope.launch {
             listeners.forEach(block)
         }
-    }
-
-    private fun notifyEqualizerIntent(shouldOpen: Boolean) {
-        notifyListeners { shouldOpenOrCloseEqualizerIntent(shouldOpen) }
     }
 
     // ========== Shuffle Management ==========
