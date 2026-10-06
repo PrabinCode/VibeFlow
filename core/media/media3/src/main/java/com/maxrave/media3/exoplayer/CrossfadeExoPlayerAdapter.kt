@@ -825,9 +825,11 @@ internal class CrossfadeExoPlayerAdapter(
     }
 
     override fun removeMediaItem(index: Int) {
-        if (index !in playlist.indices) return
-
         coroutineScope.launch {
+            // Bounds checked INSIDE the launch, on the same queue as removeAt: a removal queued
+            // earlier (a radio trimming its history) can shrink the playlist between an outside check
+            // and this body — issue #2156's crash shape, fixed the same way in MpvPlayerAdapter.
+            if (index !in playlist.indices) return@launch
             val track = playlist.removeAt(index)
 
             // Remove from precache
@@ -867,13 +869,71 @@ internal class CrossfadeExoPlayerAdapter(
         }
     }
 
+    /**
+     * Drops `[fromIndex, toIndex)` of already-played tracks in one pass: one precache pass, one
+     * timeline notification, instead of repeating both per removed track (the cost shape of #2504).
+     *
+     * Indices count the UNSHUFFLED playlist, like [removeMediaItem] and [currentMediaItemIndex].
+     * Only a range strictly BELOW the current track is accepted; anything else is refused rather
+     * than guessed at, since getting it wrong stops playback. [onRemoved] hears back exactly once
+     * either way, from inside this block — see [MediaPlayerInterface.removeMediaItems] for why.
+     */
+    override fun removeMediaItems(
+        fromIndex: Int,
+        toIndex: Int,
+        onRemoved: (removedIds: List<String>) -> Unit,
+    ) {
+        coroutineScope.launch {
+            // Everything is re-checked INSIDE the launch, on the same queue as the mutation: another
+            // queued op (clearMediaItems / setMediaItem) can change the playlist between a
+            // caller-thread check and this body, which is issue #2156's crash shape.
+            val refused =
+                fromIndex < 0 ||
+                    toIndex <= fromIndex ||
+                    toIndex > playlist.size ||
+                    toIndex > localCurrentMediaItemIndex ||
+                    // crossfadeFromIndex is a position in this same playlist and is NOT shifted here;
+                    // a cancelled fade would revert to a track ~toIndex positions away.
+                    isCrossfading ||
+                    // With shuffle on, the tracks before the current one in this unshuffled list are
+                    // not the played ones — they are part of what is still to come.
+                    internalShuffleModeEnabled ||
+                    // The receiver's queue window is mapped by absolute playlist positions
+                    // (CastHandoffManager.remoteToPlaylist); shifting them sends it the wrong tracks.
+                    isCastActive
+            if (refused) {
+                onRemoved(emptyList())
+                return@launch
+            }
+
+            val removed = playlist.subList(fromIndex, toIndex).toList()
+            playlist.subList(fromIndex, toIndex).clear()
+            localCurrentMediaItemIndex -= removed.size
+            // Before anything else can run, so the caller cuts its copy of the queue in this same step.
+            onRemoved(removed.map { it.mediaId })
+
+            removed.forEach { track ->
+                precachedPlayers.remove(track.mediaId)?.let { cached ->
+                    cleanupPlayerInternal(cached.player)
+                }
+            }
+            // Everything removed sits behind the current track and precache is keyed by mediaId,
+            // so the window ahead needs no rebuild — clearing it here would throw away the handle
+            // the next crossfade is about to use. This only tops it back up, which also restores
+            // any handle an id repeated in the dropped history took with it.
+            triggerPrecachingInternal()
+
+            notifyTimelineChanged("TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED")
+        }
+    }
+
     override fun moveMediaItem(
         fromIndex: Int,
         toIndex: Int,
     ) {
-        if (fromIndex !in playlist.indices || toIndex !in playlist.indices) return
-
         coroutineScope.launch {
+            // Same reason as removeMediaItem (issue #2156).
+            if (fromIndex !in playlist.indices || toIndex !in playlist.indices) return@launch
             val item = playlist.removeAt(fromIndex)
             playlist.add(toIndex, item)
 
@@ -920,9 +980,9 @@ internal class CrossfadeExoPlayerAdapter(
         index: Int,
         mediaItem: GenericMediaItem,
     ) {
-        if (index !in playlist.indices) return
-
         coroutineScope.launch {
+            // Same reason as removeMediaItem (issue #2156).
+            if (index !in playlist.indices) return@launch
             playlist[index] = mediaItem
 
             precachedPlayers.remove(mediaItem.mediaId)?.let { cached ->
@@ -1018,14 +1078,28 @@ internal class CrossfadeExoPlayerAdapter(
         when (internalRepeatMode) {
             PlayerConstants.REPEAT_MODE_ONE -> true
             PlayerConstants.REPEAT_MODE_ALL -> true
-            else -> localCurrentMediaItemIndex < playlist.size - 1
+            else ->
+                if (internalShuffleModeEnabled && shuffleOrder.isNotEmpty()) {
+                    val currentShufflePos =
+                        shuffleIndices.getOrNull(localCurrentMediaItemIndex) ?: -1
+                    currentShufflePos >= 0 && currentShufflePos < shuffleOrder.lastIndex
+                } else {
+                    localCurrentMediaItemIndex < playlist.size - 1
+                }
         }
 
     override fun hasPreviousMediaItem(): Boolean =
         when (internalRepeatMode) {
             PlayerConstants.REPEAT_MODE_ONE -> true
             PlayerConstants.REPEAT_MODE_ALL -> true
-            else -> localCurrentMediaItemIndex > 0
+            else ->
+                if (internalShuffleModeEnabled && shuffleOrder.isNotEmpty()) {
+                    val currentShufflePos =
+                        shuffleIndices.getOrNull(localCurrentMediaItemIndex) ?: -1
+                    currentShufflePos > 0
+                } else {
+                    localCurrentMediaItemIndex > 0
+                }
         }
 
     private fun getNextMediaItemIndex(): Int =
@@ -1782,7 +1856,7 @@ internal class CrossfadeExoPlayerAdapter(
                 }
 
                 else -> {
-                    if (localCurrentMediaItemIndex < playlist.size - 1) {
+                    if (hasNextMediaItem()) {
                         seekToNext()
                     } else {
                         notifyEqualizerIntent(false)

@@ -99,6 +99,13 @@ internal class CommonRepositoryImpl(
                         }
                     }
                 }
+            val authUserJob =
+                launch {
+                    dataStoreManager.authUser.distinctUntilChanged().collectLatest { authUser ->
+                        youTube.authUser = authUser
+                        Logger.d("YouTube", "New authUser: $authUser")
+                    }
+                }
             val usingProxy =
                 launch {
                     combine(
@@ -114,7 +121,7 @@ internal class CommonRepositoryImpl(
                         dataStoreManager.proxyPassword,
                     ) { (enabled, baseData), username, password ->
                         enabled to baseData.copy(username = username, password = password)
-                    }.collectLatest { (usingProxy, data) ->
+                    }.distinctUntilChanged().collectLatest { (usingProxy, data) ->
                         if (usingProxy) {
                             withContext(Dispatchers.IO) {
                                 // Set SOCKS proxy authenticator if credentials are provided
@@ -264,6 +271,7 @@ internal class CommonRepositoryImpl(
             localeJob.join()
             ytCookieJob.join()
             pageIdJob.join()
+            authUserJob.join()
             usingProxy.join()
             dataSyncIdJob.join()
             visitorDataJob.join()

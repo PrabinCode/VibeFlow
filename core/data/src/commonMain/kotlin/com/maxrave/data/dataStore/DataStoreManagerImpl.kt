@@ -195,14 +195,21 @@ internal class DataStoreManagerImpl(
             preferences[PAGE_ID] ?: ""
         }
 
+    override val authUser: Flow<Int> =
+        settingsDataStore.data.map { preferences ->
+            preferences[AUTH_USER] ?: 0
+        }
+
     override suspend fun setCookie(
         cookie: String,
         pageId: String?,
+        authUser: Int,
     ) {
         withContext(Dispatchers.IO) {
             settingsDataStore.edit { settings ->
                 settings[COOKIE] = cookie
                 settings[PAGE_ID] = pageId ?: ""
+                settings[AUTH_USER] = authUser
             }
         }
     }
@@ -1260,24 +1267,6 @@ internal class DataStoreManagerImpl(
         }
     }
 
-    override val keepServiceAlive: Flow<String> =
-        settingsDataStore.data.map { preferences ->
-            preferences[KEEP_SERVICE_ALIVE] ?: FALSE
-        }
-
-    override suspend fun setKeepServiceAlive(keep: Boolean) {
-        withContext(Dispatchers.IO) {
-            if (keep) {
-                settingsDataStore.edit { settings ->
-                    settings[KEEP_SERVICE_ALIVE] = TRUE
-                }
-            } else {
-                settingsDataStore.edit { settings ->
-                    settings[KEEP_SERVICE_ALIVE] = FALSE
-                }
-            }
-        }
-    }
 
     override val crossfadeEnabled: Flow<String> =
         settingsDataStore.data.map { preferences ->
@@ -1598,6 +1587,7 @@ internal class DataStoreManagerImpl(
         val COOKIE = stringPreferencesKey("cookie")
 
         val PAGE_ID = stringPreferencesKey("page_id")
+        val AUTH_USER = intPreferencesKey("auth_user")
         val LOGGED_IN = stringPreferencesKey("logged_in")
         val LOCATION = stringPreferencesKey("location")
         val MOOD_AND_GENRES_CACHE = stringPreferencesKey("mood_and_genres_cache")
@@ -1619,7 +1609,6 @@ internal class DataStoreManagerImpl(
         val FROM_SAVED_PLAYLIST = stringPreferencesKey("from_saved_playlist")
 
         val KILL_SERVICE_ON_EXIT = stringPreferencesKey("kill_service_on_exit")
-        val KEEP_SERVICE_ALIVE = stringPreferencesKey("keep_service_alive")
         val CROSSFADE_ENABLED = stringPreferencesKey("crossfade_enabled")
         val CROSSFADE_DURATION = intPreferencesKey("crossfade_duration")
         val CROSSFADE_DJ_MODE = stringPreferencesKey("crossfade_dj_mode")

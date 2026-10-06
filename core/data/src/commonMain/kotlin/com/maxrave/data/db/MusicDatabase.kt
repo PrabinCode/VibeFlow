@@ -35,7 +35,7 @@ import com.maxrave.domain.data.entities.analytics.PlaybackEventEntity
         NotificationEntity::class, TranslatedLyricsEntity::class, PodcastsEntity::class, EpisodeEntity::class,
         YourYouTubePlaylistList::class, PlaybackEventEntity::class, EventArtistEntity::class
     ],
-    version = 24,
+    version = 25,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3), AutoMigration(
@@ -76,6 +76,10 @@ import com.maxrave.domain.data.entities.analytics.PlaybackEventEntity
         AutoMigration(23, 24),
         AutoMigration(22, 24),
         AutoMigration(21, 24),
+        // 25 adds GoogleAccountEntity.authUser (NOT NULL, SQL default 0)
+        AutoMigration(24, 25),
+        AutoMigration(23, 25),
+        AutoMigration(22, 25),
     ],
 )
 @TypeConverters(Converters::class)

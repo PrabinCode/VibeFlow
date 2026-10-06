@@ -62,10 +62,12 @@ interface DataStoreManager {
     val loggedIn: Flow<String>
     val cookie: Flow<String>
     val pageId: Flow<String>
+    val authUser: Flow<Int>
 
     suspend fun setCookie(
         cookie: String,
         pageId: String?,
+        authUser: Int = 0,
     )
 
     suspend fun setLoggedIn(logged: Boolean)
@@ -323,10 +325,6 @@ interface DataStoreManager {
     val killServiceOnExit: Flow<String>
 
     suspend fun setKillServiceOnExit(kill: Boolean)
-
-    val keepServiceAlive: Flow<String>
-
-    suspend fun setKeepServiceAlive(keep: Boolean)
 
     val crossfadeEnabled: Flow<String>
 

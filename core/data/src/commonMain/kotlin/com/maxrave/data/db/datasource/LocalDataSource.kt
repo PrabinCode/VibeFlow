@@ -484,6 +484,12 @@ internal class LocalDataSource(
         to: Int,
     ) = databaseDao.shiftPositionsBackward(playlistId, from, to)
 
+    suspend fun moveSongInPlaylist(
+        playlistId: Long,
+        fromIndex: Int,
+        toIndex: Int,
+    ) = databaseDao.moveSongInPlaylist(playlistId, fromIndex, toIndex)
+
     suspend fun deletePairSongLocalPlaylist(
         playlistId: Long,
         videoId: String,

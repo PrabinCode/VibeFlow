@@ -52,6 +52,28 @@ interface MediaPlayerInterface {
 
     fun removeMediaItem(index: Int)
 
+    /**
+     * Removes `[fromIndex, toIndex)` of already-played tracks as ONE operation: one timeline
+     * notification, one precache pass. Removing the same range one item at a time is what makes a
+     * queue trim as expensive as the batch append in #2504.
+     *
+     * The removal runs later, on the player's own thread, and may be refused there. [onRemoved] is
+     * how the caller learns what actually happened: it is called exactly once, on that thread, with
+     * the ids that were removed — or an empty list when nothing was. It runs INSIDE the removal,
+     * before anything else can touch the playlist, so a caller mirroring the queue can cut its copy
+     * in the same step. Guessing the outcome from later timeline events does not work: on Desktop
+     * those arrive queued, carrying snapshots from before the removal.
+     *
+     * The default refuses; only implementations that can keep that promise remove anything.
+     */
+    fun removeMediaItems(
+        fromIndex: Int,
+        toIndex: Int,
+        onRemoved: (removedIds: List<String>) -> Unit,
+    ) {
+        onRemoved(emptyList())
+    }
+
     fun moveMediaItem(
         fromIndex: Int,
         toIndex: Int,
