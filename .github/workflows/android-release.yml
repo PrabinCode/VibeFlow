@@ -33,7 +33,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 21
-          distribution: "temurin"
+          distribution: "microsoft"
           cache: 'gradle'
 
       - name: Update Sentry Secrets
@@ -105,7 +105,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 21
-          distribution: "temurin"
+          distribution: "microsoft"
           cache: 'gradle'
 
       - name: Setup Keystore
@@ -162,7 +162,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 21
-          distribution: "temurin"
+          distribution: "microsoft"
           cache: 'gradle'
 
       - name: Create local.properties
