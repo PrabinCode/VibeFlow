@@ -1,0 +1,10 @@
+- VibeFlow 2.2.0 Release
+- Apple Music animated artwork support and fluid mesh backdrop
+- Hand-drawn canvas playback indicators (lighter and smoother animations)
+- Fullscreen lyrics animation with continuous ambient flare
+- Share lyrics cards with background artwork
+- Playlist custom image cropper
+- Audio DSP enhancements: System EQ routing, delay & reverb effects, multi-audio language switching
+- Artist canvas & liked songs quick access
+- Home section browse & endless radio queue trimming
+- Scraper stability and performance improvements

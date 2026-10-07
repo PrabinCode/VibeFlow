@@ -1,0 +1,10 @@
+- Phát hành VibeFlow 2.2.0
+- Hỗ trợ ảnh động Apple Music và hình nền fluid mesh
+- Chỉ báo phát nhạc vẽ tay (nhẹ và mượt mà hơn)
+- Hoạt ảnh lời bài hát toàn màn hình với hiệu ứng flare liên tục
+- Chia sẻ thẻ lời bài hát kèm ảnh nền
+- Cắt ảnh tùy chỉnh cho danh sách phát
+- Nâng cấp DSP âm thanh: Bộ cân bằng hệ thống, hiệu ứng delay & reverb, chuyển đổi ngôn ngữ âm thanh
+- Canvas nghệ sĩ & bài hát yêu thích
+- Duyệt mục trang chủ & cắt tỉa hàng đợi radio
+- Ổn định và cải thiện hiệu năng scraper
