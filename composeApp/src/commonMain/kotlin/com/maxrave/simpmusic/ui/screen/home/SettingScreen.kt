@@ -316,12 +316,15 @@ import simpmusic.composeapp.generated.resources.ok
 import simpmusic.composeapp.generated.resources.open_system_equalizer
 import simpmusic.composeapp.generated.resources.openai
 import simpmusic.composeapp.generated.resources.openai_api_compatible
+import simpmusic.composeapp.generated.resources.original_audio
 import simpmusic.composeapp.generated.resources.other_app
 import simpmusic.composeapp.generated.resources.play_explicit_content
 import simpmusic.composeapp.generated.resources.play_explicit_content_description
 import simpmusic.composeapp.generated.resources.play_video_for_video_track_instead_of_audio_only
 import simpmusic.composeapp.generated.resources.playback
 import simpmusic.composeapp.generated.resources.player_cache
+import simpmusic.composeapp.generated.resources.preferred_audio_language
+import simpmusic.composeapp.generated.resources.preferred_audio_language_message
 import simpmusic.composeapp.generated.resources.proxy
 import simpmusic.composeapp.generated.resources.proxy_description
 import simpmusic.composeapp.generated.resources.proxy_host
@@ -493,6 +496,7 @@ fun SettingScreen(
     val lyricsOffset by viewModel.lyricsOffset.collectAsStateWithLifecycle()
     val lyricsRomanization by viewModel.lyricsRomanization.collectAsStateWithLifecycle(true)
     val youtubeSubtitleLanguage by viewModel.youtubeSubtitleLanguage.collectAsStateWithLifecycle()
+    val preferredAudioLanguage by viewModel.preferredAudioLanguage.collectAsStateWithLifecycle()
     val spotifyLoggedIn by viewModel.spotifyLogIn.collectAsStateWithLifecycle()
     val spotifyLyrics by viewModel.spotifyLyrics.collectAsStateWithLifecycle()
     val spotifyCanvas by viewModel.spotifyCanvas.collectAsStateWithLifecycle()
@@ -1454,6 +1458,33 @@ fun SettingScreen(
                                 confirm =
                                     runBlocking { getString(Res.string.change) } to { state ->
                                         viewModel.setYoutubeSubtitleLanguage(state.textField?.value ?: "")
+                                    },
+                                dismiss = runBlocking { getString(Res.string.cancel) },
+                            ),
+                        )
+                    },
+                )
+                SettingItem(
+                    title = stringResource(Res.string.preferred_audio_language),
+                    subtitle = preferredAudioLanguage.ifEmpty { stringResource(Res.string.original_audio) },
+                    onClick = {
+                        viewModel.setAlertData(
+                            SettingAlertState(
+                                title = runBlocking { getString(Res.string.preferred_audio_language) },
+                                textField =
+                                    SettingAlertState.TextFieldData(
+                                        label = runBlocking { getString(Res.string.preferred_audio_language) },
+                                        value = preferredAudioLanguage,
+                                        // Empty is valid here: it means "original audio".
+                                        verifyCodeBlock = {
+                                            (it.isEmpty() || it.isTwoLetterCode()) to
+                                                runBlocking { getString(Res.string.invalid_language_code) }
+                                        },
+                                    ),
+                                message = runBlocking { getString(Res.string.preferred_audio_language_message) },
+                                confirm =
+                                    runBlocking { getString(Res.string.change) } to { state ->
+                                        viewModel.setPreferredAudioLanguage(state.textField?.value ?: "")
                                     },
                                 dismiss = runBlocking { getString(Res.string.cancel) },
                             ),

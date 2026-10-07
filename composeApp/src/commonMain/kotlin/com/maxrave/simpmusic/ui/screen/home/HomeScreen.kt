@@ -524,7 +524,7 @@ fun HomeScreen(
                     }
                     LazyColumn(
                         state = scrollState,
-                        verticalArrangement = Arrangement.spacedBy(28.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         itemsIndexed(homeData, key = { _, item ->
                             item.hashCode().toString() + (mainHomeThumbnail ?: "nothumb")

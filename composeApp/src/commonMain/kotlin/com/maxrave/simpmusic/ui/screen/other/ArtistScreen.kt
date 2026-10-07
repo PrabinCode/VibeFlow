@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.MarqueeAnimationMode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -69,6 +70,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -107,21 +109,28 @@ import com.maxrave.simpmusic.ui.component.DescriptionView
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeItemArtist
 import com.maxrave.simpmusic.ui.component.HomeItemContentPlaylist
+import com.maxrave.simpmusic.expect.shareUrl
 import com.maxrave.simpmusic.ui.component.HomeItemVideo
 import com.maxrave.simpmusic.ui.component.LimitedBorderAnimationView
 import com.maxrave.simpmusic.ui.component.LiquidGlassIconButton
 import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
 import com.maxrave.simpmusic.ui.component.SongFullWidthItems
+import com.maxrave.simpmusic.ui.component.liquidGlass
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
 import com.maxrave.simpmusic.ui.icon.Check
+import com.maxrave.simpmusic.ui.icon.IosShare
+import com.maxrave.simpmusic.ui.icon.Movie
+import com.maxrave.simpmusic.ui.icon.MovieOff
 import com.maxrave.simpmusic.ui.icon.PersonAdd
 import com.maxrave.simpmusic.ui.icon.Sensors
 import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
+import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryDynamicPlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.MoreAlbumsDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
+import com.maxrave.simpmusic.ui.screen.library.LibraryDynamicPlaylistType
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.ArtistScreenState
 import com.maxrave.simpmusic.viewModel.ArtistViewModel
@@ -134,20 +143,27 @@ import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.albums
+import simpmusic.composeapp.generated.resources.baseline_favorite_24
 import simpmusic.composeapp.generated.resources.description
 import simpmusic.composeapp.generated.resources.error
 import simpmusic.composeapp.generated.resources.featured_inArtist
 import simpmusic.composeapp.generated.resources.follow
 import simpmusic.composeapp.generated.resources.followed
+import simpmusic.composeapp.generated.resources.liked_songs
+import simpmusic.composeapp.generated.resources.liked_songs_by
+import simpmusic.composeapp.generated.resources.liked_songs_count
 import simpmusic.composeapp.generated.resources.more
 import simpmusic.composeapp.generated.resources.no_description
 import simpmusic.composeapp.generated.resources.popular
 import simpmusic.composeapp.generated.resources.related_artists
+import simpmusic.composeapp.generated.resources.share
 import simpmusic.composeapp.generated.resources.singles
 import simpmusic.composeapp.generated.resources.start_radio
 import simpmusic.composeapp.generated.resources.unknown
@@ -164,6 +180,11 @@ fun ArtistScreen(
     val artistScreenState by viewModel.artistScreenState.collectAsStateWithLifecycle()
     val isFollowed by viewModel.followed.collectAsStateWithLifecycle()
     val canvasUrl by viewModel.canvasUrl.collectAsStateWithLifecycle()
+    // Header shows the canvas video by default; the top-right toggle swaps it for the artist's
+    // picture. Keyed on the canvas so a different artist's canvas starts as video again.
+    var showCanvasVideo by rememberSaveable(canvasUrl?.first) { mutableStateOf(true) }
+    val headerCanvas = canvasUrl?.takeIf { showCanvasVideo }
+    val shareTitle = stringResource(Res.string.share)
     val artistLogo by viewModel.artistLogo.collectAsStateWithLifecycle()
 
     val playingTrack by remember {
@@ -296,11 +317,11 @@ fun ArtistScreen(
                                                     modifier =
                                                         Modifier
                                                             .fillMaxSize()
-                                                            .alpha(if (canvasUrl != null) 0f else 1f),
+                                                            .alpha(if (headerCanvas != null) 0f else 1f),
                                                 )
                                                 // Canvas (Spotify) plays AS the background when present;
                                                 // otherwise the static artwork above is the fallback.
-                                                canvasUrl?.let { canvas ->
+                                                headerCanvas?.let { canvas ->
                                                     // Canvas is a tall/portrait video. cropToBounds center
                                                     // scale-to-covers it into the square frame (ContentScale.Crop):
                                                     // true video aspect ratio, no stretch, overflow clipped.
@@ -311,6 +332,14 @@ fun ArtistScreen(
                                                     )
                                                 }
                                             } // end media layer (Haze source)
+                                            // 5% black over the artwork/canvas, under the fade and scrim, so
+                                            // a bright photo sits back a little behind the title.
+                                            Box(
+                                                modifier =
+                                                    Modifier
+                                                        .fillMaxSize()
+                                                        .background(Color.Black.copy(alpha = 0.05f)),
+                                            )
                                             // Bottom fade — progressive blur (Haze) over the media layer, so the
                                             // canvas/artwork edge melts into the page bg.
                                             Box(
@@ -402,6 +431,34 @@ fun ArtistScreen(
                                                     .size(48.dp),
                                         ) {
                                             navController.navigateUp()
+                                        }
+                                        // Top-right pill mirroring the back button, shaped like the
+                                        // Playlist header's: [canvas ⇄ picture] when a canvas exists, then
+                                        // share. A sibling of the backdrop source, like the back button.
+                                        Row(
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(12.dp)
+                                                    .windowInsetsPadding(WindowInsets.statusBars)
+                                                    .height(48.dp)
+                                                    .liquidGlass(artworkBackdrop, RoundedCornerShape(24.dp)),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            if (canvasUrl != null) {
+                                                IconButton(onClick = { showCanvasVideo = !showCanvasVideo }) {
+                                                    Icon(
+                                                        imageVector = if (showCanvasVideo) SimpIcons.MovieOff else SimpIcons.Movie,
+                                                        contentDescription = null,
+                                                        tint = Color.White,
+                                                    )
+                                                }
+                                            }
+                                            IconButton(
+                                                onClick = { shareUrl(shareTitle, "https://music.youtube.com/channel/$channelId") },
+                                            ) {
+                                                Icon(SimpIcons.IosShare, contentDescription = shareTitle, tint = Color.White)
+                                            }
                                         }
                                     }
 
@@ -497,6 +554,7 @@ fun ArtistScreen(
                             }
                             item(contentType = "sections") {
                                 ArtistSections(
+                                    channelId = channelId,
                                     state = state,
                                     playingTrack = playingTrack,
                                     descriptionTint = sectionTint,
@@ -724,6 +782,7 @@ fun ArtistScreen(
                             }
 
                             ArtistSections(
+                                channelId = channelId,
                                 state = state,
                                 playingTrack = playingTrack,
                                 descriptionTint = color,
@@ -765,6 +824,7 @@ fun ArtistScreen(
  */
 @Composable
 private fun ArtistSections(
+    channelId: String,
     state: ArtistScreenState.Success,
     playingTrack: String?,
     descriptionTint: Color,
@@ -773,7 +833,26 @@ private fun ArtistSections(
     sharedViewModel: SharedViewModel,
     onTrackMore: (Track) -> Unit,
 ) {
+    val likedSongCount by viewModel.likedSongCount.collectAsStateWithLifecycle()
     Column {
+        // Liked songs by this artist (issue #2524), shaped like Spotify's section: a heading, then
+        // the artist's picture wearing the liked heart beside the count. Shown only once at least
+        // one song is liked; opens the full list with the route's channelId, the id it was counted by.
+        androidx.compose.animation.AnimatedVisibility(likedSongCount > 0) {
+            LikedSongsSection(
+                imageUrl = state.data.imageUrl?.toSquareThumbnailUrl(),
+                count = likedSongCount,
+                artistName = state.data.title.orEmpty(),
+                onClick = {
+                    navController.navigate(
+                        LibraryDynamicPlaylistDestination(
+                            type = LibraryDynamicPlaylistType.ArtistLiked(channelId).toStringParams(),
+                        ),
+                    )
+                },
+            )
+        }
+
         // Popular Songs
         AnimatedVisibility(state.data.popularSongs.isNotEmpty()) {
             Column {
@@ -1212,5 +1291,73 @@ private fun ArtistSections(
             )
         }
         EndOfPage()
+    }
+}
+
+/**
+ * "Liked songs" as a section of its own: the heading, then the artist's picture wearing the liked
+ * heart beside "3 songs" / "By <artist>". The whole block opens
+ * [LibraryDynamicPlaylistType.ArtistLiked]. Heading and text colours follow the sections around it,
+ * which draw white on the artwork-tinted page.
+ */
+@Composable
+private fun LikedSongsSection(
+    imageUrl: String?,
+    count: Int,
+    artistName: String,
+    onClick: () -> Unit,
+) {
+    Column {
+        // No "More" button beside it, so the padding stands in for the height the TextButton gives
+        // the Popular and Singles headings.
+        Text(
+            text = stringResource(Res.string.liked_songs),
+            style = typo().labelMedium,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+        ) {
+            Box(modifier = Modifier.size(48.dp)) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                )
+                Image(
+                    painter = painterResource(Res.drawable.baseline_favorite_24),
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black)
+                            .padding(3.dp),
+                )
+            }
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(
+                    text = pluralStringResource(Res.plurals.liked_songs_count, count, count),
+                    style = typo().titleSmall,
+                    color = Color.White,
+                    maxLines = 1,
+                )
+                Text(
+                    text = stringResource(Res.string.liked_songs_by, artistName),
+                    style = typo().bodySmall,
+                    color = Color(0xC4FFFFFF),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }

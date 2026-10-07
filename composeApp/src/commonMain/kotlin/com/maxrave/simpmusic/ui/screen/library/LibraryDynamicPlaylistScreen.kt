@@ -74,6 +74,7 @@ import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import dev.chrisbanes.haze.rememberHazeState
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -83,6 +84,8 @@ import simpmusic.composeapp.generated.resources.artists
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.favorite
 import simpmusic.composeapp.generated.resources.followed
+import simpmusic.composeapp.generated.resources.liked_songs
+import simpmusic.composeapp.generated.resources.liked_songs_count
 import simpmusic.composeapp.generated.resources.lower_plays
 import simpmusic.composeapp.generated.resources.most_played
 import simpmusic.composeapp.generated.resources.search
@@ -117,6 +120,9 @@ fun LibraryDynamicPlaylistScreen(
     var tempMostPlayed by remember { mutableStateOf(emptyList<SongEntity>()) }
     val downloaded by viewModel.listDownloadedSong.collectAsStateWithLifecycle()
     var tempDownloaded by remember { mutableStateOf(emptyList<SongEntity>()) }
+    val artistLiked by viewModel.listArtistLikedSong.collectAsStateWithLifecycle()
+    val artistLikedName by viewModel.artistLikedName.collectAsStateWithLifecycle()
+    var tempArtistLiked by remember { mutableStateOf(emptyList<SongEntity>()) }
     val analyticsUIState by analyticsViewModel.analyticsUIState.collectAsStateWithLifecycle()
     var tempTopTracks by remember { mutableStateOf(analyticsUIState.topTracks.data ?: emptyList()) }
     var tempTopArtists by remember { mutableStateOf(analyticsUIState.topArtists.data ?: emptyList()) }
@@ -125,6 +131,13 @@ fun LibraryDynamicPlaylistScreen(
         rememberHazeState(
             blurEnabled = true,
         )
+
+    LaunchedEffect(type) {
+        val parsed = LibraryDynamicPlaylistType.toType(type)
+        if (parsed is LibraryDynamicPlaylistType.ArtistLiked) {
+            viewModel.getArtistLikedSong(parsed)
+        }
+    }
 
     LaunchedEffect(query) {
         Logger.w("LibraryDynamicPlaylistScreen", "Check query: $query")
@@ -136,6 +149,7 @@ fun LibraryDynamicPlaylistScreen(
         Logger.w("LibraryDynamicPlaylistScreen", "Check tempMostPlayed: $tempMostPlayed")
         tempDownloaded = downloaded.filter { it.title.contains(query, ignoreCase = true) }
         Logger.w("LibraryDynamicPlaylistScreen", "Check tempDownloaded: $tempDownloaded")
+        tempArtistLiked = artistLiked.filter { it.title.contains(query, ignoreCase = true) }
         tempTopTracks =
             analyticsUIState.topTracks.data
                 ?.filter { it.second.title.contains(query, ignoreCase = true) }
@@ -349,6 +363,14 @@ fun LibraryDynamicPlaylistScreen(
                             mostPlayed
                         }
                     }
+
+                    is LibraryDynamicPlaylistType.ArtistLiked -> {
+                        if (query.isNotEmpty() && showSearchBar) {
+                            tempArtistLiked
+                        } else {
+                            artistLiked
+                        }
+                    }
                 },
                 key = { it.hashCode() },
             ) { song ->
@@ -405,6 +427,11 @@ fun LibraryDynamicPlaylistScreen(
                     stringResource(Res.string.album_length, downloaded.size.toString(), "")
                 LibraryDynamicPlaylistType.Followed ->
                     "${followed.size} ${stringResource(Res.string.artists)}"
+                is LibraryDynamicPlaylistType.ArtistLiked ->
+                    listOfNotNull(
+                        pluralStringResource(Res.plurals.liked_songs_count, artistLiked.size, artistLiked.size),
+                        artistLikedName,
+                    ).joinToString(" · ")
                 else -> null
             }
         Box {
@@ -581,6 +608,14 @@ sealed class LibraryDynamicPlaylistType {
 
     data object TopAlbums : LibraryDynamicPlaylistType()
 
+    /**
+     * Liked songs crediting one artist — opened from the "Liked songs" row on that artist's page
+     * (issue #2524).
+     */
+    data class ArtistLiked(
+        val channelId: String,
+    ) : LibraryDynamicPlaylistType()
+
     fun name(): StringResource =
         when (this) {
             Favorite -> Res.string.favorite
@@ -590,6 +625,7 @@ sealed class LibraryDynamicPlaylistType {
             TopAlbums -> Res.string.your_top_albums
             TopArtists -> Res.string.your_top_artists
             TopTracks -> Res.string.your_top_tracks
+            is ArtistLiked -> Res.string.liked_songs
         }
 
     // For serialization and navigation
@@ -602,19 +638,24 @@ sealed class LibraryDynamicPlaylistType {
             TopAlbums -> "top_albums"
             TopArtists -> "top_artists"
             TopTracks -> "top_tracks"
+            is ArtistLiked -> ARTIST_LIKED_PREFIX + channelId
         }
 
     companion object {
+        private const val ARTIST_LIKED_PREFIX = "artist_liked_"
+
         fun toType(input: String): LibraryDynamicPlaylistType =
-            when (input) {
-                "favorite" -> Favorite
-                "followed" -> Followed
-                "most_played" -> MostPlayed
-                "downloaded" -> Downloaded
-                "top_albums" -> TopAlbums
-                "top_artists" -> TopArtists
-                "top_tracks" -> TopTracks
-                else -> throw IllegalArgumentException("Unknown type: $this")
+            when {
+                input == "favorite" -> Favorite
+                input == "followed" -> Followed
+                input == "most_played" -> MostPlayed
+                input == "downloaded" -> Downloaded
+                input == "top_albums" -> TopAlbums
+                input == "top_artists" -> TopArtists
+                input == "top_tracks" -> TopTracks
+                input.startsWith(ARTIST_LIKED_PREFIX) && input.removePrefix(ARTIST_LIKED_PREFIX).isNotBlank() ->
+                    ArtistLiked(input.removePrefix(ARTIST_LIKED_PREFIX))
+                else -> throw IllegalArgumentException("Unknown type: $input")
             }
     }
 }

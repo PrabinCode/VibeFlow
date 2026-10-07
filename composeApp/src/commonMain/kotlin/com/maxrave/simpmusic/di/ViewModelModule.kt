@@ -3,6 +3,7 @@ package com.maxrave.simpmusic.di
 import com.maxrave.simpmusic.viewModel.AlbumViewModel
 import com.maxrave.simpmusic.viewModel.AnalyticsViewModel
 import com.maxrave.simpmusic.viewModel.ArtistViewModel
+import com.maxrave.simpmusic.viewModel.BrowseViewModel
 import com.maxrave.simpmusic.viewModel.HomeViewModel
 import com.maxrave.simpmusic.viewModel.ImportViewModel
 import com.maxrave.simpmusic.viewModel.LibraryDynamicPlaylistViewModel
@@ -121,6 +122,11 @@ val viewModelModule =
         }
         viewModel {
             MoreAlbumsViewModel(
+                get(),
+            )
+        }
+        viewModel {
+            BrowseViewModel(
                 get(),
             )
         }

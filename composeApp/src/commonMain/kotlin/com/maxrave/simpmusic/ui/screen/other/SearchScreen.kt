@@ -71,6 +71,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,6 +124,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PodcastDestination
+import com.maxrave.simpmusic.ui.navigation.destination.search.SearchDestination
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.SearchScreenUIState
 import com.maxrave.simpmusic.viewModel.SearchType
@@ -297,6 +299,22 @@ fun SearchScreen(
             navController = navController,
             song = sheetSong,
         )
+    }
+
+    // On search icon click while on search screen, open keyboard. Android only feature
+    if (getPlatform() == Platform.Android) {
+        val reloadDestination by sharedViewModel.reloadDestination.collectAsStateWithLifecycle()
+        val keyboardController = LocalSoftwareKeyboardController.current
+        LaunchedEffect(reloadDestination) {
+            if (reloadDestination == SearchDestination::class) {
+                if (searchUIType == SearchUIType.EMPTY) {
+                    isExpanded = true
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
+                }
+                sharedViewModel.reloadDestinationDone()
+            }
+        }
     }
 
     Box(

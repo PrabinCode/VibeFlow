@@ -30,6 +30,9 @@ interface SongRepository {
 
     fun getLikedSongs(): Flow<List<SongEntity>>
 
+    /** Liked songs crediting [channelId] anywhere in their artist list; re-emits on every change. */
+    fun getLikedSongsByArtist(channelId: String): Flow<List<SongEntity>>
+
     fun getCanvasSong(max: Int): Flow<List<SongEntity>>
 
     fun getSongById(id: String): Flow<SongEntity?>

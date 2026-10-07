@@ -16,6 +16,7 @@ import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.playlist
@@ -35,6 +36,16 @@ class LibraryDynamicPlaylistViewModel(
 
     private val _listDownloadedSong: MutableStateFlow<List<SongEntity>> = MutableStateFlow(emptyList())
     val listDownloadedSong: StateFlow<List<SongEntity>> get() = _listDownloadedSong
+
+    /**
+     * Liked songs crediting one artist, filled in once a route names the artist.
+     */
+    private val _listArtistLikedSong: MutableStateFlow<List<SongEntity>> = MutableStateFlow(emptyList())
+    val listArtistLikedSong: StateFlow<List<SongEntity>> get() = _listArtistLikedSong
+
+    /** That artist's name for the header, or null when the artist was never stored. */
+    private val _artistLikedName: MutableStateFlow<String?> = MutableStateFlow(null)
+    val artistLikedName: StateFlow<String?> get() = _artistLikedName
 
     init {
         getFavoriteSong()
@@ -84,6 +95,34 @@ class LibraryDynamicPlaylistViewModel(
         }
     }
 
+    /**
+     * Liked songs crediting [artistLiked]'s artist, ordered like [getFavoriteSong] so this list and
+     * Favorites agree. Observed rather than read once: unliking a song here drops it from the list.
+     */
+    fun getArtistLikedSong(artistLiked: LibraryDynamicPlaylistType.ArtistLiked) {
+        viewModelScope.launch {
+            _artistLikedName.value = artistRepository.getArtistById(artistLiked.channelId).firstOrNull()?.name
+        }
+        viewModelScope.launch {
+            songRepository.getLikedSongsByArtist(artistLiked.channelId).collectLatest { likedSong ->
+                _listArtistLikedSong.value =
+                    likedSong.sortedByDescending {
+                        it.favoriteAt ?: REMOVED_SONG_DATE_TIME
+                    }
+            }
+        }
+    }
+
+    private suspend fun getPlaylistName(type: LibraryDynamicPlaylistType): String {
+        val name =
+            when (type) {
+                is LibraryDynamicPlaylistType.ArtistLiked ->
+                    listOfNotNull(getString(type.name()), _artistLikedName.value).joinToString(" · ")
+                else -> getString(type.name())
+            }
+        return "${getString(Res.string.playlist)} $name"
+    }
+
     fun playSong(
         videoId: String,
         type: LibraryDynamicPlaylistType,
@@ -94,28 +133,27 @@ class LibraryDynamicPlaylistViewModel(
                 LibraryDynamicPlaylistType.Downloaded -> listDownloadedSong.value to listDownloadedSong.value.find { it.videoId == videoId }
                 LibraryDynamicPlaylistType.Followed -> return
                 LibraryDynamicPlaylistType.MostPlayed -> listMostPlayedSong.value to listMostPlayedSong.value.find { it.videoId == videoId }
+                is LibraryDynamicPlaylistType.ArtistLiked -> listArtistLikedSong.value to listArtistLikedSong.value.find { it.videoId == videoId }
                 else -> return
             }
         if (playTrack == null) return
-        setQueueData(
-            QueueData.Data(
-                listTracks = targetList.toArrayListTrack(),
-                firstPlayedTrack = playTrack.toTrack(),
-                playlistId = null,
-                playlistName = "${
-                    getString(
-                        Res.string.playlist,
-                    )
-                } ${getString(type.name())}",
-                playlistType = PlaylistType.RADIO,
-                continuation = null,
-            ),
-        )
-        loadMediaItem(
-            playTrack.toTrack(),
-            Config.PLAYLIST_CLICK,
-            targetList.indexOf(playTrack).coerceAtLeast(0),
-        )
+        viewModelScope.launch {
+            setQueueData(
+                QueueData.Data(
+                    listTracks = targetList.toArrayListTrack(),
+                    firstPlayedTrack = playTrack.toTrack(),
+                    playlistId = null,
+                    playlistName = getPlaylistName(type),
+                    playlistType = PlaylistType.RADIO,
+                    continuation = null,
+                ),
+            )
+            loadMediaItem(
+                playTrack.toTrack(),
+                Config.PLAYLIST_CLICK,
+                targetList.indexOf(playTrack).coerceAtLeast(0),
+            )
+        }
     }
 
     private fun getSongList(type: LibraryDynamicPlaylistType): List<SongEntity> =
@@ -123,27 +161,30 @@ class LibraryDynamicPlaylistViewModel(
             LibraryDynamicPlaylistType.Favorite -> listFavoriteSong.value
             LibraryDynamicPlaylistType.Downloaded -> listDownloadedSong.value
             LibraryDynamicPlaylistType.MostPlayed -> listMostPlayedSong.value
+            is LibraryDynamicPlaylistType.ArtistLiked -> listArtistLikedSong.value
             else -> emptyList()
         }
 
     fun playAll(type: LibraryDynamicPlaylistType) {
         val targetList = getSongList(type)
         val firstTrack = targetList.firstOrNull() ?: return
-        setQueueData(
-            QueueData.Data(
-                listTracks = targetList.toArrayListTrack(),
-                firstPlayedTrack = firstTrack.toTrack(),
-                playlistId = null,
-                playlistName = "${getString(Res.string.playlist)} ${getString(type.name())}",
-                playlistType = PlaylistType.RADIO,
-                continuation = null,
-            ),
-        )
-        loadMediaItem(
-            firstTrack.toTrack(),
-            Config.PLAYLIST_CLICK,
-            0,
-        )
+        viewModelScope.launch {
+            setQueueData(
+                QueueData.Data(
+                    listTracks = targetList.toArrayListTrack(),
+                    firstPlayedTrack = firstTrack.toTrack(),
+                    playlistId = null,
+                    playlistName = getPlaylistName(type),
+                    playlistType = PlaylistType.RADIO,
+                    continuation = null,
+                ),
+            )
+            loadMediaItem(
+                firstTrack.toTrack(),
+                Config.PLAYLIST_CLICK,
+                0,
+            )
+        }
     }
 
     fun shuffle(type: LibraryDynamicPlaylistType) {
@@ -151,20 +192,22 @@ class LibraryDynamicPlaylistViewModel(
         if (targetList.isEmpty()) return
         val shuffledList = targetList.shuffled()
         val firstTrack = shuffledList.first()
-        setQueueData(
-            QueueData.Data(
-                listTracks = shuffledList.toArrayListTrack(),
-                firstPlayedTrack = firstTrack.toTrack(),
-                playlistId = null,
-                playlistName = "${getString(Res.string.playlist)} ${getString(type.name())}",
-                playlistType = PlaylistType.RADIO,
-                continuation = null,
-            ),
-        )
-        loadMediaItem(
-            firstTrack.toTrack(),
-            Config.PLAYLIST_CLICK,
-            0,
-        )
+        viewModelScope.launch {
+            setQueueData(
+                QueueData.Data(
+                    listTracks = shuffledList.toArrayListTrack(),
+                    firstPlayedTrack = firstTrack.toTrack(),
+                    playlistId = null,
+                    playlistName = getPlaylistName(type),
+                    playlistType = PlaylistType.RADIO,
+                    continuation = null,
+                ),
+            )
+            loadMediaItem(
+                firstTrack.toTrack(),
+                Config.PLAYLIST_CLICK,
+                0,
+            )
+        }
     }
 }

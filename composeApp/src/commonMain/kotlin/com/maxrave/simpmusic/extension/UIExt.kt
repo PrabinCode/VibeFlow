@@ -1,6 +1,7 @@
 package com.maxrave.simpmusic.extension
 
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -345,6 +346,24 @@ fun NonLazyGrid(
             }
         }
     }
+}
+
+suspend fun LazyListState.animateScrollAndAnchorItemTop(
+    index: Int,
+    extraOffsetPx: Float = 0f,
+) {
+    if (index < 0) return
+    val initiallyVisible = this.layoutInfo.visibleItemsInfo.any { it.index == index }
+    if (!initiallyVisible) {
+        this.scrollToItem(index)
+    }
+    withFrameNanos { }
+    val itemInfo =
+        this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    this.animateScrollBy(
+        value = (itemInfo.offset - this.layoutInfo.viewportStartOffset).toFloat() + extraOffsetPx,
+        animationSpec = spring(dampingRatio = 0.9f, stiffness = 180f),
+    )
 }
 
 suspend fun LazyListState.animateScrollAndCentralizeItem(index: Int) {

@@ -27,6 +27,7 @@ val shimmerLineLight = Color(0xFFCFC8C8)
 
 val overlay = Color(0x32242424)
 val blackMoreOverlay = Color(0x8f242424)
+val desktopPanelDark = Color(0xFF121212)
 
 // ===== Legacy — do not add new usages =====
 

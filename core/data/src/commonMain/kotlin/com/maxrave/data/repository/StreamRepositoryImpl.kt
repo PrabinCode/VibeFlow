@@ -108,9 +108,12 @@ internal class StreamRepositoryImpl(
                 } else {
                     18
                 }
-            // 134, 136, 137
             youTube
-                .player(videoId, noLogIn = muxed)
+                .player(
+                    videoId,
+                    noLogIn = muxed,
+                    preferredAudioLanguage = dataStoreManager.preferredAudioLanguage.first(),
+                )
                 .onSuccess { data ->
                     val response = data.second
                     if (data.third == MediaType.Song) {
