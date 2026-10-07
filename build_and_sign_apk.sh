@@ -33,8 +33,8 @@ if [ ! -f "release.keystore" ] && [ ! -f "simpmusic.jks" ] && [ ! -f "keystore.j
 fi
 
 # Clean and build with Gradle
-./gradlew clean --no-configuration-cache
-./gradlew :androidApp:assembleRelease --no-configuration-cache
+./gradlew clean --no-configuration-cache --stacktrace
+./gradlew :androidApp:assembleRelease --no-configuration-cache --stacktrace
 
 OUTPUT_DIR="./androidApp/build/outputs/apk/$BUILD_TYPE"
 echo "Renaming APK outputs in $OUTPUT_DIR..."

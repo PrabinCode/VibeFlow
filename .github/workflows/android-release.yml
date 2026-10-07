@@ -22,7 +22,7 @@ permissions:
 jobs:
   build-full-release:
     name: Build full release version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash
@@ -59,6 +59,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          mkdir -p ~/.android
           if [ -n "$BASE_64_SIGNING_KEY" ]; then
             echo "$BASE_64_SIGNING_KEY" | base64 -d > release.keystore
           else
@@ -93,7 +94,7 @@ jobs:
 
   build-foss-release:
     name: Build foss release version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash
@@ -114,6 +115,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          mkdir -p ~/.android
           if [ -n "$BASE_64_SIGNING_KEY" ]; then
             echo "$BASE_64_SIGNING_KEY" | base64 -d > release.keystore
           else
@@ -322,7 +324,7 @@ jobs:
 
   publish-release:
     name: Publish to GitHub Releases
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [build-full-release, build-foss-release, build-desktop-packages, wrap-mac-dmg]
     if: always() && (needs.build-full-release.result == 'success' || needs.build-foss-release.result == 'success')
     permissions:
