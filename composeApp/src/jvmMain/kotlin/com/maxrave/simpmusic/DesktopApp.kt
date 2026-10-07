@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,6 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.maxrave.simpmusic.extension.DesktopWindowChrome
+import java.awt.Canvas
+import java.awt.Container
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import javax.swing.Timer
 import coil3.ImageLoader
 import coil3.compose.LocalPlatformContext
 import coil3.compose.setSingletonImageLoaderFactory
@@ -297,73 +304,56 @@ fun runDesktopApp(args: Array<String> = emptyArray()) {
                 exitApplication()
             }
         }
-        // Detect virtual machines (Parallels, VirtualBox, VMware, etc.).
-        // Transparent + undecorated Compose windows don't render on VM
-        // GPU drivers — the window stays invisible while the JVM keeps
-        // running, so we must detect the VM and fall back to a normal
-        // decorated window.
-        //
-        // We probe Manufacturer + Model because brand strings live in
-        // different fields per hypervisor (Parallels-on-ARM puts
-        // "Parallels Software International Inc." in Manufacturer and
-        // "Parallels ARM Virtual Machine" in Model; VirtualBox uses
-        // "innotek GmbH" + "VirtualBox"; etc).
-        //
-        // Microsoft removed `wmic` from Windows 11 (deprecated since
-        // 10 21H1), so on modern Windows it returns "command not
-        // recognized" and our previous detection always saw an empty
-        // vendor — Parallels Win 11 ARM users hit this and got an
-        // invisible window. PowerShell `Get-CimInstance` is the modern
-        // replacement; we try it first and fall back to wmic for older
-        // hosts.
-        val isVM =
-            remember {
-                val osName = System.getProperty("os.name", "")
-                if (!osName.contains("Windows", ignoreCase = true)) {
-                    return@remember false
-                }
-                val probes =
-                    listOf(
-                        listOf(
-                            "powershell",
-                            "-NoProfile",
-                            "-Command",
-                            "(Get-CimInstance Win32_ComputerSystem | " +
-                                "Select-Object Manufacturer,Model | " +
-                                "Format-List | Out-String).Trim()",
-                        ),
-                        listOf("wmic", "computersystem", "get", "manufacturer,model"),
-                    )
-                val sysInfo =
-                    probes
-                        .asSequence()
-                        .mapNotNull { cmd ->
-                            runCatching {
-                                val p =
-                                    ProcessBuilder(cmd)
-                                        .redirectErrorStream(true)
-                                        .start()
-                                val out = p.inputStream.bufferedReader().readText()
-                                if (p.waitFor() == 0 && out.isNotBlank()) out else null
-                            }.getOrNull()
-                        }
-                        .firstOrNull()
-                        .orEmpty()
-                val vmTokens = listOf("Parallels", "VirtualBox", "VMware", "QEMU", "KVM", "Xen", "Hyper-V")
-                vmTokens.any { sysInfo.contains(it, ignoreCase = true) } ||
-                    System.getProperty("compose.window.no-transparent", "false").toBooleanStrictOrNull() == true
-            }
+        // Windows and Linux keep the native title bar (on Linux, undecorated + transparent
+        // breaks on some distros/WMs). Only macOS draws the custom one.
+        val nativeTitleBar = !isMacOS
+        // Publish whether the custom title bar will be mounted so getScreenSizeInfo() can
+        // subtract the 40dp strip it occupies above the content (see DesktopWindowChrome).
+        LaunchedEffect(nativeTitleBar) {
+            DesktopWindowChrome.customTitleBarVisible = !nativeTitleBar
+        }
         Window(
             onCloseRequest = {
                 isVisible = false
             },
             title = stringResource(Res.string.app_name),
             icon = painterResource(Res.drawable.circle_app_icon),
-            undecorated = !isVM,
-            transparent = !isVM,
+            undecorated = !nativeTitleBar,
+            transparent = !nativeTitleBar,
             state = windowState,
             visible = isVisible,
         ) {
+            // AWT on GNOME/XWayland (CMP-9528): moving the window to another monitor puts the
+            // native window of the Compose canvas back at the top of the frame, under the title
+            // bar, instead of at insets.top, so the UI sits one title-bar height too high over a
+            // grey strip. Resizing the frame 1px and back in one go does not help: both sizes are
+            // applied before Swing lays out, so nothing moves. After a move settles, find a canvas
+            // that really sits above the client area (locationOnScreen asks the X server) and
+            // change ITS size by 1px and back: every bounds change re-sends its native position,
+            // recomputed from its parents. The frame is untouched, so maximized windows are safe.
+            if (System.getProperty("os.name", "").contains("Linux", ignoreCase = true)) {
+                DisposableEffect(window) {
+                    val settle =
+                        Timer(300) {
+                            if (!window.isShowing) return@Timer
+                            val clientTop = window.locationOnScreen.y + window.insets.top
+                            val canvas =
+                                window.contentPane.findCanvas { it.isShowing && it.locationOnScreen.y < clientTop }
+                                    ?: return@Timer
+                            canvas.setSize(canvas.width, canvas.height + 1)
+                            canvas.setSize(canvas.width, canvas.height - 1)
+                        }.apply { isRepeats = false }
+                    val listener =
+                        object : ComponentAdapter() {
+                            override fun componentMoved(event: ComponentEvent) = settle.restart()
+                        }
+                    window.addComponentListener(listener)
+                    onDispose {
+                        settle.stop()
+                        window.removeComponentListener(listener)
+                    }
+                }
+            }
             // Restore requests (Dock reopen, tray, second instance) also need a
             // z-order raise; visibility/minimized are reset by the
             // application-level collector, but toFront needs the AWT window.
@@ -377,14 +367,14 @@ fun runDesktopApp(args: Array<String> = emptyArray()) {
                     Modifier
                         .fillMaxSize()
                         .then(
-                            if (!isVM) {
+                            if (!nativeTitleBar) {
                                 Modifier.clip(RoundedCornerShape(12.dp))
                             } else {
                                 Modifier
                             },
                         ),
             ) {
-                if (!isVM) {
+                if (!nativeTitleBar) {
                     CustomTitleBar(
                         title = stringResource(Res.string.app_name),
                         windowState = windowState,
@@ -449,3 +439,7 @@ private object DesktopRestoreSignal {
         _requests.tryEmit(Unit)
     }
 }
+
+// Skiko draws into a heavyweight java.awt.Canvas nested somewhere under the content pane.
+private fun Container.findCanvas(predicate: (Canvas) -> Boolean): Canvas? =
+    components.firstNotNullOfOrNull { if (it is Canvas) it.takeIf(predicate) else (it as? Container)?.findCanvas(predicate) }

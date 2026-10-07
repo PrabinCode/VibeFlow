@@ -97,6 +97,7 @@ import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.logger.Logger
+import com.maxrave.simpmusic.expect.ui.HorizontalScrollBar
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.extension.angledGradientBackground
 import com.maxrave.simpmusic.extension.artworkScrimBrush
@@ -1024,6 +1025,11 @@ fun QuickPicks(
                 }
             }
         }
+        HorizontalScrollBar(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            scrollState = lazyListState,
+            flingBehavior = snapperFlingBehavior,
+        )
     }
 }
 
@@ -1076,6 +1082,11 @@ fun MoodMomentAndGenre(
                     }
                 }
             }
+            HorizontalScrollBar(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                scrollState = gridState,
+                flingBehavior = flingBehavior,
+            )
         }
     }
 }
@@ -1186,5 +1197,10 @@ fun ChartData(
                 )
             }
         }
+        HorizontalScrollBar(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            scrollState = lazyListState2,
+            flingBehavior = snapperFlingBehavior2,
+        )
     }
 }

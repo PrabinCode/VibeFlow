@@ -235,6 +235,7 @@ fun HomeItem(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                 scrollState = lazyListState,
+                flingBehavior = snapperFlingBehavior,
             )
         }
     }
